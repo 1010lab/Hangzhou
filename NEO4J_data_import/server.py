@@ -20,10 +20,10 @@ def check_args(args):
     assert args["siteID"] is not None,"站点名称不能为空"
     assert args["neo4jPath"] is not None,"neo4j目录不能为空"
     if args.get("dataPath") == None:
-        args["dataPath"] = "data"
+        args["dataPath"] = r"NEO4J_data_import\data"
         # raise Exception("接收站点数据时所存储的文件路径不能为空")
     if args.get("neo4jDataPath") == None:
-        args["neo4jDataPath"] = "neo4j_data"
+        args["neo4jDataPath"] = r"NEO4J_data_import\neo4j_data"
         # raise Exception("生成neo4j数据的本文件下的文件路径不能为空")
     return args
 
@@ -34,7 +34,7 @@ def convert_args(args):
     return args
 
 @app.route('/loadNodeAndRelationToNeo4j', methods=['POST'])
-def insertNodeAndRelationToNeo4j():
+def loadNodeAndRelationToNeo4j():
     req_data = request.get_json(force=True)
     # 所有的参数
     # args = {}
