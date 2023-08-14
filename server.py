@@ -6,7 +6,8 @@ from flask_cors import CORS
 # from gevent import pywsgi
 
 #获取具体的服务
-from main import *
+from neo4j_query.query import Query
+from NEO4J_data_import.main import *
 
 # 参数
 import argparse
@@ -15,15 +16,18 @@ app=Flask(__name__)
 
 CORS(app, resources=r'/*',supports_credentials=True)
 
+q = Query()
+
+
 #检查参数
 def check_args(args):
     assert args["siteID"] is not None,"站点名称不能为空"
     assert args["neo4jPath"] is not None,"neo4j目录不能为空"
     if args.get("dataPath") == None:
-        args["dataPath"] = r"NEO4J_data_import\data"
+        args["dataPath"] = r"NEO4J_data_import/data"
         # raise Exception("接收站点数据时所存储的文件路径不能为空")
     if args.get("neo4jDataPath") == None:
-        args["neo4jDataPath"] = r"NEO4J_data_import\neo4j_data"
+        args["neo4jDataPath"] = r"NEO4J_data_import/neo4j_data"
         # raise Exception("生成neo4j数据的本文件下的文件路径不能为空")
     return args
 
@@ -55,9 +59,22 @@ def loadNodeAndRelationToNeo4j():
            'node_info':r.node_info,'relation_info':r.relation_info}
     # 拼接code，message，data
     answer = {"code":200,"message":"","data":res}
-    
     return jsonify(answer)
 
+@app.route('/countQuery', methods=['POST'])
+def countQuery():
+    req_data = request.get_json(force=True)
+    # 所有的参数
+    # label
+    # # 查询结点的标签值
+    args = check_args(req_data)
+    args = convert_args(args)
+    print(args["DATA_PATH"])
+    r = main(args)
+    res = {'node_num':r.node_num,'relation_num':r.relation_num,
+           'node_info':r.node_info,'relation_info':r.relation_info}
+    # 拼接code，message，data
+    answer = {"code":200,"message":"","data":res}
     
  
 if __name__=='__main__':

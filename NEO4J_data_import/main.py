@@ -1,7 +1,9 @@
+import sys
+sys.path.append('./NEO4J_data_import')
 from get_node_relation import GetNodeRelation
 from process import Processor
 from load import Loader,Result
-import argparse
+
 
 def main(args) -> Result:
     # getBodyNodeAndRelation or getInstanceNodeAndRelation
