@@ -61,7 +61,7 @@ def loadNodeAndRelationToNeo4j():
     answer = {"code":200,"message":"","data":res}
     return jsonify(answer)
 
-@app.route('/countQuery', methods=['POST'])
+@app.route('query/countQuery', methods=['POST'])
 def countQuery():
     req_data = request.get_json(force=True)
     # 所有的参数
