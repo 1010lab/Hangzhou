@@ -11,13 +11,19 @@ class Query():
     #个数统计查询
     def count_query(self,label):
         cypher =  '''MATCH (n:{label}) RETURN  count(n) AS count'''.format(label = label)
+        if isinstance(label,list):
+            cypher =  '''MATCH (n) RETURN  count(n) AS count'''   
         return self.graph.run(cypher).data()[0]
 
     #一跳关系查询，不区分body和instance
-    def one_hop_query(self,nodeId):
-        cypher =  '''MATCH (startNode)-[r]->(endNode)'''+\
-                '''WHERE startNode.nodeId = '{startNodeId}' '''.format(startNodeId = nodeId)+\
-                '''RETURN startNode, r, endNode'''
+    def one_hop_query(self,nodeId,label=None):
+        cypher =  f'''MATCH (startNode{":"+label if label else ""})-[r]->(endNode)
+                      WHERE startNode.nodeId = '{nodeId}' 
+                      RETURN startNode, r, endNode'''
+        # if label is not None:
+        #      cypher =  '''MATCH (startNode:{label})-[r]->(endNode)'''.format(label = label)+\
+        #             '''WHERE startNode.nodeId = '{startNodeId}' '''.format(startNodeId = nodeId)+\
+        #             '''RETURN startNode, r, endNode'''
         return self.graph.run(cypher).data()[0]
 
     #三跳关系查询，不区分body和instance

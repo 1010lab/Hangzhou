@@ -16,7 +16,7 @@ load_api =  LoadApi()
 app.add_url_rule('/loadNodeAndRelationToNeo4j', view_func=load_api.loadNodeAndRelationToNeo4j,methods=['POST'])
 
 query_api = QueryApi()
-app.add_url_rule('/countQuery', view_func=query_api.countQuery,methods=['POST'])
+app.add_url_rule(r'/query/countQuery', view_func=query_api.countQuery,methods=['POST'])
 
 if __name__=='__main__':
     app.run(host="0.0.0.0",threaded=True)
