@@ -18,6 +18,7 @@ app.add_url_rule('/loadNodeAndRelationToNeo4j', view_func=load_api.loadNodeAndRe
 query_api = QueryApi()
 app.add_url_rule('/countQuery', view_func=query_api.countQuery,methods=['POST'])
 
+
 if __name__=='__main__':
     app.run(host="0.0.0.0",threaded=True)
     # server.serve_forever()
