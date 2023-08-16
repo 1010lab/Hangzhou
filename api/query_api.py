@@ -12,7 +12,7 @@ class CountQuery(Resource):
     def post(self):
         # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
-        parse.add_argument('label',default=['body','label'],choices=['body','label'])
+        parse.add_argument('label',default=['body','label'],choices=['body','instance'])
         args = parse.parse_args()
         res = q.count_query(args.label)
         answer = {"code":200,"message":"success","data":res}

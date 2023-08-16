@@ -4,3 +4,4 @@ requirements.txt
 *.md
 /NEO4J_data_import/data/
 /NEO4J_data_import/neo4j_data/
+.*
