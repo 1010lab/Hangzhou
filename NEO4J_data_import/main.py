@@ -21,13 +21,11 @@ def main(args) -> Result:
     if check_code1+check_code2 > 20:
         p.get_body_relation()
         p.get_instance_relation()
-        r1 = loader.load_node()
-        r2 = loader.load_relation()
-        # 合并结果
-        r = r1.merge(r2)
+        loader.load_node()
+        r = loader.load_relation()
     else:
         r = loader.load_node()
-    return r
+    return r.to_string()
         
 
 # if __name__ == "__main__":

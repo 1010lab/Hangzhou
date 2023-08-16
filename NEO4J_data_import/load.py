@@ -27,14 +27,11 @@ class Result():
         self.node_info = []
         self.relation_info = []
     
-    # 结果合并返回一个新对象
-    def merge(self,other):
-        new = Result()
-        new.node_num = self.node_num + other.node_num
-        new.relation_num = self.relation_num + other.relation_num
-        new.node_info = self.node_info + other.node_info
-        new.relation_info = self.relation_info + other.relation_info
-        return new
+    
+    def to_string(self):
+        res = {'node_num':self.node_num,'relation_num':self.relation_num,
+            'node_info':self.node_info,'relation_info':self.relation_info}
+        return res
     
 class Loader():
     def __init__(self,args) -> None:
@@ -50,13 +47,13 @@ class Loader():
     #将本项目下的导入数据移动并覆盖至NEO4J目录下的import文件夹中
     def __move__(self):
         data_dir = os.path.join(self.args["NEO4J_DATA_PATH"],self.args["siteID"])
-        print(data_dir)
         assert os.path.exists(data_dir),'源文件不存在'
         for file_name in os.listdir(data_dir):
             file = os.path.join(data_dir,file_name)
             shutil.copy2(file, self.import_dir)
     
-    def load_node(self) -> Result:    
+    def load_node(self) -> Result:
+        self.__move__()    
         #导入节点
         logger.info('******导入程序已启动*******')
         #导入BODY的cypher语句

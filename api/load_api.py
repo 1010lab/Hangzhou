@@ -29,8 +29,6 @@ class LoadApi(Resource):
         args = parse.parse_args()
         args = self.convert_args(args)
         r = main(args)
-        res = {'node_num':r.node_num,'relation_num':r.relation_num,
-            'node_info':r.node_info,'relation_info':r.relation_info}
         # 拼接code，message，data
-        answer = {"code":200,"message":"","data":res}
+        answer = {"code":200,"message":"","data":r}
         return jsonify(answer)
