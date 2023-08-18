@@ -5,6 +5,8 @@ import re
 import glob
 import uuid
 import time
+import ast
+from tree import TreeNode,create_tree
 
 '''
     处理CSV文件，形成用于导入NEO4J的数据格式以及字段要求。
@@ -58,7 +60,14 @@ class Processor():
         type = node_df['type']
         lastSiteNode = node_df['lastSiteNodeId']
         labelCollections = node_df['labelCollections']
-        virtualTreeList = node_df['virtualTreeList']
+        # virtualTreeList = node_df['virtualTreeList']
+        virtualTreeObeject = node_df['virtualTreeList'].fillna('[]').\
+                                                        apply(ast.literal_eval)
+        virtualTreeList = virtualTreeObeject.apply(lambda x: [item['id'] for item in x])
+        virtualTreeList = virtualTreeList.apply(lambda x: ",".join(x) if x!=[] else 'null')
+        
+        tree_list = get_tree(virtualTreeObeject,id,node_name)
+
         structureList = node_df['structureList']
         sn_type = node_df['snType']
         #生成新的CSV文件
@@ -69,6 +78,7 @@ class Processor():
                                 'type','last_site_nodeId','label_collections','virtualTreeList',
                                 'structureList'])
         self.write_by_label(node_df)
+        return tree_list
 
     def get_instance_relation(self):
         instance_relation_df = pd.read_csv(self.relation_path + '//Instance.csv')
@@ -137,6 +147,23 @@ class Processor():
                         index=False,
                         encoding='utf-8',
                         )   
+
+def get_tree(virtualTreeObject,nodeId,nodeName):
+    tree_list=[]
+    tree_id_list = []
+    for row,id,name in zip(virtualTreeObject,nodeId,nodeName):
+        for item in row:
+            if  item['id'] not in tree_id_list:
+                tree,treeId = create_tree(item,id,name)
+                tree_list.append(tree)
+                tree_id_list.append(treeId)
+            #若存在此树，则添加节点id和节点name
+            else:
+                #用于指向需要添加的TreeNode
+                index = tree_id_list.index(item['id'])
+                tree_list[index].add_nodeIdLists(id)
+                tree_list[index].add_nodeNameLists(name)
+    return tree_list
 
 def generate_id():
     unique_uuid = uuid.uuid4() 

@@ -1,7 +1,6 @@
 load.log
 /**/__pycache__/
 requirements.txt
-*.md
 /NEO4J_data_import/data/
 /NEO4J_data_import/neo4j_data/
 /neo4j_query/__pycache__

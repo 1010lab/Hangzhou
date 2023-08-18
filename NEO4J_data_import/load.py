@@ -35,7 +35,7 @@ class Result():
     
 class Loader():
     def __init__(self,args) -> None:
-        self.graph = Graph("http://localhost:7474/", auth=("neo4j", "lml2000326"),name = "neo4j")
+        self.graph = Graph("http://localhost:7474/", auth=("neo4j", "123"))
         self.graph.delete_all()
         self.args = args
         self.result = Result()
@@ -57,13 +57,13 @@ class Loader():
         #导入节点
         logger.info('******导入程序已启动*******')
         #导入BODY的cypher语句
-        body_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args["siteID"]+'\\BODY.csv') +\
-                      '''MERGE (n:{label} {{nodeId: COALESCE(line.id, -1),nodeName:line.node_name,
-                                      snType:line.sn_type,type:COALESCE(line.type,'null') ,
-                                      virtualTreeList:COALESCE(line.virtualTreeList,'null'),
-                                      structureList:COALESCE(line.structureList,'null'),
-                                      lastSiteNodeId:COALESCE(line.lastSiteNodeId,'null'),
-                                      labelCollections:COALESCE(line.labelCollections,'null')
+        body_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args.siteID+'\\BODY.csv') +\
+                      '''MERGE (n:{label} {{nodeId:line.id,nodeName:line.node_name,
+                                      snType:line.sn_type,type:COALESCE(line.type,[]) ,
+                                      virtualTreeList:split(line.virtualTreeList, ','),
+                                      structureList:COALESCE(line.structureList,[]),
+                                      lastSiteNodeId:COALESCE(line.lastSiteNodeId,[]),
+                                      labelCollections:COALESCE(line.labelCollections,[])
                                     }})\n'''.format(label='body') +\
                        '''return n'''
         #运行cypher,body_res记录返回结点n信息
