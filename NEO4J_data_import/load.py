@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import shutil
 import logging
+from tree import create_relation
 
 #自定义logger对象，用于记录load的操作日志 
 logger = logging.getLogger(__name__)
@@ -29,9 +30,9 @@ class Result():
     
     
     def to_string(self):
-        res = {'node_num':self.node_num,'relation_num':self.relation_num,
-            'node_info':self.node_info,'relation_info':self.relation_info}
-        return res
+        # res = {'node_num':self.node_num,'relation_num':self.relation_num,
+        #     'node_info':self.node_info,'relation_info':self.relation_info}
+        return self.__dict__
     
 class Loader():
     def __init__(self,args) -> None:
@@ -57,27 +58,31 @@ class Loader():
         #导入节点
         logger.info('******导入程序已启动*******')
         #导入BODY的cypher语句
-        body_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args.siteID+'\\BODY.csv') +\
-                      '''MERGE (n:{label} {{nodeId:line.id,nodeName:line.node_name,
-                                      snType:line.sn_type,type:COALESCE(line.type,[]) ,
-                                      virtualTreeList:split(line.virtualTreeList, ','),
-                                      structureList:COALESCE(line.structureList,[]),
-                                      lastSiteNodeId:COALESCE(line.lastSiteNodeId,[]),
-                                      labelCollections:COALESCE(line.labelCollections,[])
-                                    }})\n'''.format(label='body') +\
+        body_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+                      '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args.siteID+'\\BODY.csv') +\
+                      '''MERGE (n:{label} {{
+                            nodeId:line.id,nodeName:line.node_name,
+                            snType:line.sn_type,type:COALESCE(line.type,[]) ,
+                            virtualTreeList:split(line.virtualTreeList, ','),
+                            structureList:COALESCE(line.structureList,[]),
+                            lastSiteNode:split(line.lastSiteNode, ','),
+                            labelCollections:COALESCE(line.labelCollections,[])
+                        }})\n'''.format(label='body') +\
                        '''return n'''
         #运行cypher,body_res记录返回结点n信息
         body_res = self.graph.run(body_cypher).data()
         
         #导入BODY的cypher语句
-        instance_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args["siteID"]+'\\INSTANCE.csv') +\
-                          '''MERGE (n:{label} {{nodeId: COALESCE(line.id, -1),nodeName:line.node_name,
-                                      snType:line.sn_type,type:COALESCE(line.type,'null'),
-                                      virtualTreeList:COALESCE(line.virtualTreeList,'null'),
-                                      structureList:COALESCE(line.structureList,'null'),
-                                      lastSiteNodeId:COALESCE(line.lastSiteNodeId,'null'),
-                                      labelCollections:COALESCE(line.labelCollections,'null')
-                                    }})\n'''.format(label='instance') +\
+        instance_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+                          '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args["siteID"]+'\\INSTANCE.csv') +\
+                          '''MERGE (n:{label} {{
+                                nodeId: COALESCE(line.id, -1),nodeName:line.node_name,
+                                snType:line.sn_type,type:COALESCE(line.type,'null'),
+                                virtualTreeList:COALESCE(line.virtualTreeList,'null'),
+                                structureList:COALESCE(line.structureList,'null'),
+                                lastSiteNodeId:COALESCE(line.lastSiteNodeId,'null'),
+                                labelCollections:COALESCE(line.labelCollections,'null')
+                            }})\n'''.format(label='instance') +\
                           '''return n'''
         #运行cypher,instance_res记录返回结点n信息                  
         instance_res = self.graph.run(instance_cypher).data()
@@ -90,7 +95,8 @@ class Loader():
         self.result.node_info.append(f'导入实体节点:{len(instance_res)}')
         #导入BODY与INSTANCE关系的cypher语句
         relation2_filename = os.path.join(self.args["siteID"]+'/relation_b2i.csv')
-        relation2_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=relation2_filename) +\
+        relation2_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+            '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=relation2_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
             '''MERGE (from)-[r:{relation}]-> (to)\n'''.format(relation="is_instance") +\
             '''RETURN r'''
@@ -107,14 +113,17 @@ class Loader():
     def load_relation(self) -> Result:
         body_relation_filename = os.path.join(self.args["siteID"]+'/body_relation.csv')
         #导入BODY关系的cypher语句
-        body_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=body_relation_filename) +\
+        body_relation_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+            '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=body_relation_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
-            '''MERGE (from)-[r:{relation}{{relationType:line.relationType,
-                                           ID:line.ID,
-                                           relationName:line.relationName,
-                                           StructureList:COALESCE(line.structureList,'null'),
-                                           relationInfo:line.relationInfo
-                                         }}]-> (to)\n'''.format(relation="belong_to") +\
+            '''MERGE (from)-[r:{relation}{{
+                relationType:line.relationType,
+                relationId:line.relationId,
+                relationName:line.relationName,
+                StructureList:COALESCE(line.structureList,'null'),
+                treeId:split(line.treeId, ','),
+                treeName:COALESCE(line.treeName,'null')
+            }}]-> (to)\n'''.format(relation="belong_to") +\
             '''SET r.NNRelationList = \n''' +\
             '''CASE WHEN line.NNRelationList IS NOT NULL THEN line.NNRelationList ELSE NULL END\n''' +\
             '''SET r.SSRelationList = \n''' +\
@@ -134,7 +143,8 @@ class Loader():
 
         instance_relation_filename = os.path.join(self.args["siteID"]+'/instance_relation.csv')
         #导入INSTANCE关系的cypher语句
-        instance_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
+        instance_relation_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+            '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
             '''MERGE (from)-[r:{relation}{{relationId:line.relationId}}]-> (to)\n'''.format(relation="belong_to") +\
             '''RETURN r'''
@@ -146,7 +156,35 @@ class Loader():
         self.result.relation_num += len(instance_relation_res)
         self.result.relation_info.append(f'导入实例关系:{len(instance_relation_res)}')
         return self.result
-       
+    
+    def tree_relation(self,tree_list):
+        rel_num = 0
+        for tree in tree_list:
+            treeId = tree.treeId
+            #创建Node对象
+            tree_node = tree.create_node(self.graph)
+            #查找到某虚拟树的根节点
+            cypher = f'''MATCH (n:body)
+                        WHERE  NOT (n)-[:belong_to]->() AND "{treeId}" IN n.virtualTreeList
+                        RETURN n'''
+            root_node = self.graph.run(cypher).data()
+            rel_num += len(root_node)
+            #找到每一个虚拟树的根节点
+            for body_node in root_node:
+                body_node = body_node['n']
+                create_relation(body_node,tree_node,self.graph)
+        logger.info('导入虚拟树节点成功')
+        self.result.node_num += rel_num
+        self.result.node_info.append(f'导入虚拟树节点:{rel_num}')
+        logger.debug(f'导入虚拟树关系:{rel_num}')
+        self.result.relation_num += rel_num
+        self.result.relation_info.append(f'导入虚拟树关系:{rel_num}')
+        return self.result
+        
+        
+        
+        
+
 
 
 

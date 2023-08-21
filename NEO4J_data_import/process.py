@@ -58,11 +58,13 @@ class Processor():
         node_name = node_df['nodeName']
         label = node_df['attribute']
         type = node_df['type']
-        lastSiteNode = node_df['lastSiteNodeId']
+        lastSiteNode = node_df['lastSiteNodeId'].fillna('[]').\
+                                        apply(ast.literal_eval).\
+                                        apply(lambda x: ",".join(x) if x!=[] else 'null')
         labelCollections = node_df['labelCollections']
         # virtualTreeList = node_df['virtualTreeList']
         virtualTreeObeject = node_df['virtualTreeList'].fillna('[]').\
-                                                        apply(ast.literal_eval)
+                                                apply(ast.literal_eval)
         virtualTreeList = virtualTreeObeject.apply(lambda x: [item['id'] for item in x])
         virtualTreeList = virtualTreeList.apply(lambda x: ",".join(x) if x!=[] else 'null')
         
@@ -75,7 +77,7 @@ class Processor():
                           type,lastSiteNode,labelCollections,virtualTreeList,
                           structureList]).T
         node_df = pd.DataFrame(arrays,columns=['id','node_name','label','sn_type',
-                                'type','last_site_nodeId','label_collections','virtualTreeList',
+                                'type','lastSiteNode','labelCollections','virtualTreeList',
                                 'structureList'])
         self.write_by_label(node_df)
         return tree_list
@@ -109,11 +111,9 @@ class Processor():
             index=False,
             encoding='utf-8',
         )
-
-    
+  
     def get_body_relation(self):
         body_relation_df = pd.read_csv(self.relation_path+'//Body.csv')
-
         #获取NEO4J导入字段
         body_relation_df['relationType'] = body_relation_df['relationType'].astype(str).replace({'0': '00'})
         relation_type = body_relation_df['relationType']
@@ -121,23 +121,27 @@ class Processor():
         body_relation_df = add_attribute(body_relation_df)
         start_id = body_relation_df['siteNodeId']
         end_id = body_relation_df['assSimpleSN']
-        ID = body_relation_df['id']
+        relationId = body_relation_df['id']
         relationName = body_relation_df['name']
         structureList = body_relation_df['structureList']
+        treeId = body_relation_df['treeId'].fillna('[]').\
+                                        apply(ast.literal_eval).\
+                                        apply(lambda x: ",".join(x) if x!=[] else 'null')
+        treeName = body_relation_df['treeName']
         #关系信息{'treeId':treeId,'treeName':treeName}
-        relationInfo = body_relation_df.apply(lambda row: {'treeId':row['treeId'],'treeName':row['name']}, axis=1)
+        # relationInfo = body_relation_df.apply(lambda row: {'treeId':row['treeId'],'treeName':row['name']}, axis=1)
         NNRelationList = body_relation_df['NNRelationList']
         SSRelationList = body_relation_df['SSRelationList']
         SNRelationList = body_relation_df['SNRelationList']
         SNSRelationList = body_relation_df['SNSRelationList']
 
         #生成新的CSV文件
-        arrays = np.array([start_id,relation_type,end_id,relationInfo,ID,
-                           relationName,structureList,
+        arrays = np.array([start_id,relation_type,end_id,treeId,treeName,
+                           relationId,relationName,structureList,
                            NNRelationList,SSRelationList,SNRelationList,SNSRelationList
                           ]).T
-        body_relation_df = pd.DataFrame(arrays,columns=['startId','relationType','endId','relationInfo','ID',
-                                        'relationName','structureList',
+        body_relation_df = pd.DataFrame(arrays,columns=['startId','relationType','endId','treeId',
+                                        'treeName','relationId','relationName','structureList',
                                         'NNRelationList','SSRelationList','SNRelationList','SNSRelationList'
                                         ])
         body_relation_df['startId'] = body_relation_df['startId'].map(lambda x : x.split('@')[1] if pd.notnull(x) else x)
@@ -148,6 +152,7 @@ class Processor():
                         encoding='utf-8',
                         )   
 
+#从虚拟树json数据中解析出所有的虚拟树TreeNode对象
 def get_tree(virtualTreeObject,nodeId,nodeName):
     tree_list=[]
     tree_id_list = []
@@ -186,8 +191,6 @@ def get_dataframe(path):
         dataframes.append(df)
     
     return pd.concat(dataframes, ignore_index=True)
-
-
 
 def add_attribute(data):
     '''

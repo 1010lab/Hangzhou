@@ -2,7 +2,7 @@ from py2neo import Graph
 
 class Query():
     def __init__(self) -> None:
-        self.graph = Graph("http://localhost:7474/", auth=("neo4j", "lml2000326"),name = "neo4j")
+        self.graph = Graph("http://localhost:7474/", auth=("neo4j", "123"))
 
     #基于固定属性查询所有结点
     def by_attribute_query(self,attributeKey,attributeValue,label):

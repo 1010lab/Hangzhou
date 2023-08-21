@@ -18,18 +18,19 @@ def main(args) -> Result:
     p = Processor(args)
     #Loader导入数据
     loader = Loader(args)
+    #返回虚拟树节点列表
     tree_list = p.get_node()
-    for tree in tree_list:
-        print(tree.__dict__)
-        tree._create()
+    #依次创建虚拟树节点
+    
     #若校验码大于20(即BODY和INSTANCE中有任一一个或两个关系数据),反之没有关系数据，不处理以及导入关系数据
     if check_code1+check_code2 > 20:
         p.get_body_relation()
         p.get_instance_relation()
         loader.load_node()
-        r = loader.load_relation()
+        loader.load_relation()
     else:
-        r = loader.load_node()
+        loader.load_node()
+    r = loader.tree_relation(tree_list)
     return r.to_string()
         
 
