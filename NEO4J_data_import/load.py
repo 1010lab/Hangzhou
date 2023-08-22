@@ -66,7 +66,7 @@ class Loader():
                             virtualTreeList:split(line.virtualTreeList, ','),
                             structureList:COALESCE(line.structureList,[]),
                             lastSiteNode:split(line.lastSiteNode, ','),
-                            labelCollections:COALESCE(line.labelCollections,[])
+                            labelColList:split(line.labelColList,',')
                         }})\n'''.format(label='body') +\
                        '''return n'''
         #运行cypher,body_res记录返回结点n信息
@@ -81,7 +81,7 @@ class Loader():
                                 virtualTreeList:COALESCE(line.virtualTreeList,'null'),
                                 structureList:COALESCE(line.structureList,'null'),
                                 lastSiteNodeId:COALESCE(line.lastSiteNodeId,'null'),
-                                labelCollections:COALESCE(line.labelCollections,'null')
+                                labelColList:split(line.labelColList,',')
                             }})\n'''.format(label='instance') +\
                           '''return n'''
         #运行cypher,instance_res记录返回结点n信息                  
@@ -157,34 +157,35 @@ class Loader():
         self.result.relation_info.append(f'导入实例关系:{len(instance_relation_res)}')
         return self.result
     
-    def tree_relation(self,tree_list):
+    def tree_relation(self,tree,type):
         rel_num = 0
-        for tree in tree_list:
-            treeId = tree.treeId
-            #创建Node对象
-            tree_node = tree.create_node(self.graph)
-            #查找到某虚拟树的根节点
-            cypher = f'''MATCH (n:body)
+        treeId = tree.treeId
+        tree_node = tree.create_node(self.graph)
+        if(type == 'virtualTree'):
+        #查找到某虚拟树的根节点
+            cypher = f'''
+                        MATCH (n:body)
                         WHERE  NOT (n)-[:belong_to]->() AND "{treeId}" IN n.virtualTreeList
                         RETURN n'''
             root_node = self.graph.run(cypher).data()
             rel_num += len(root_node)
-            #找到每一个虚拟树的根节点
             for body_node in root_node:
                 body_node = body_node['n']
-                create_relation(body_node,tree_node,self.graph)
-        logger.info('导入虚拟树节点成功')
-        self.result.node_num += rel_num
-        self.result.node_info.append(f'导入虚拟树节点:{rel_num}')
-        logger.debug(f'导入虚拟树关系:{rel_num}')
-        self.result.relation_num += rel_num
-        self.result.relation_info.append(f'导入虚拟树关系:{rel_num}')
-        return self.result
-        
-        
-        
-        
+                create_relation(body_node,'is_root',tree_node,self.graph)
+            logger.info('导入虚拟树节点成功')
+            self.result.node_num += rel_num
+            self.result.node_info.append(f'导入虚拟树节点:{rel_num}')
+            logger.debug(f'导入虚拟树关系:{rel_num}')
+            self.result.relation_num += rel_num
+            self.result.relation_info.append(f'导入虚拟树关系:{rel_num}')   
 
+        #建立标签与节点间的关系
+        if(type == 'labelCollection'):
+            for id in tree.nodeIdLists:
+                cypher = f'''MATCH (n) WHERE n.nodeId = "{id}" RETURN n'''
+                node = self.graph.run(cypher).data()[0]['n']
+                create_relation(tree_node,'is_label',node,self.graph)
+        return self.result
 
 
 

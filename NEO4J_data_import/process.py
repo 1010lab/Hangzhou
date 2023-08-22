@@ -6,7 +6,7 @@ import glob
 import uuid
 import time
 import ast
-from tree import TreeNode,create_tree
+from tree import create_tree,create_label_col
 
 '''
     处理CSV文件，形成用于导入NEO4J的数据格式以及字段要求。
@@ -61,26 +61,30 @@ class Processor():
         lastSiteNode = node_df['lastSiteNodeId'].fillna('[]').\
                                         apply(ast.literal_eval).\
                                         apply(lambda x: ",".join(x) if x!=[] else 'null')
-        labelCollections = node_df['labelCollections']
+        labelColObject = node_df['labelCollections'].fillna('[]').\
+                                                            apply(ast.literal_eval)
+        labelColList = labelColObject.apply(lambda x: [item['id'] for item in x])
+        labelColList = labelColList.apply(lambda x: ",".join(x) if x!=[] else 'null')                                                    
+        label_tree_list = get_tree(labelColObject,id,node_name,"create_label_col")
         # virtualTreeList = node_df['virtualTreeList']
         virtualTreeObeject = node_df['virtualTreeList'].fillna('[]').\
                                                 apply(ast.literal_eval)
         virtualTreeList = virtualTreeObeject.apply(lambda x: [item['id'] for item in x])
         virtualTreeList = virtualTreeList.apply(lambda x: ",".join(x) if x!=[] else 'null')
         
-        tree_list = get_tree(virtualTreeObeject,id,node_name)
+        tree_list = get_tree(virtualTreeObeject,id,node_name,'create_tree')
 
         structureList = node_df['structureList']
         sn_type = node_df['snType']
         #生成新的CSV文件
         arrays = np.array([id,node_name,label,sn_type,
-                          type,lastSiteNode,labelCollections,virtualTreeList,
+                          type,lastSiteNode,labelColList,virtualTreeList,
                           structureList]).T
         node_df = pd.DataFrame(arrays,columns=['id','node_name','label','sn_type',
-                                'type','lastSiteNode','labelCollections','virtualTreeList',
+                                'type','lastSiteNode','labelColList','virtualTreeList',
                                 'structureList'])
         self.write_by_label(node_df)
-        return tree_list
+        return tree_list,label_tree_list
 
     def get_instance_relation(self):
         instance_relation_df = pd.read_csv(self.relation_path + '//Instance.csv')
@@ -153,13 +157,16 @@ class Processor():
                         )   
 
 #从虚拟树json数据中解析出所有的虚拟树TreeNode对象
-def get_tree(virtualTreeObject,nodeId,nodeName):
+def get_tree(virtualTreeObject,nodeId,nodeName,func_name): 
     tree_list=[]
     tree_id_list = []
     for row,id,name in zip(virtualTreeObject,nodeId,nodeName):
         for item in row:
             if  item['id'] not in tree_id_list:
-                tree,treeId = create_tree(item,id,name)
+                if func_name == 'create_tree':
+                    tree,treeId = create_tree(item,id,name)
+                else:
+                    tree,treeId = create_label_col(item,id,name)
                 tree_list.append(tree)
                 tree_id_list.append(treeId)
             #若存在此树，则添加节点id和节点name
