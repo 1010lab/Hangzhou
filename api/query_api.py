@@ -92,6 +92,9 @@ class TreeQuery(Resource):
         line_dict["id"] = relation["relationId"]
         line_dict["from"] = start_node["nodeId"]
         line_dict["to"] = end_node["nodeId"]
+        line_dict["info"]  = {"relationType":relation["relationType"],
+                        "treeId":relation["treeId"],
+                        "labelList":"未导入部分"}
         self.lines.append(line_dict)
 
     def find(self,id):
@@ -120,7 +123,7 @@ class TreeQuery(Resource):
         args = parse.parse_args()
         res = q.tree_query(args.label,args.treeId)
         self._convert_data(res)
-        answer = {"code":200,"message":"success","data":{"nodes":self.nodes,
+        answer = {"code":200,"message":"","data":{"nodes":self.nodes,
                                                         "lines":self.lines}}
         return jsonify(answer)
 
@@ -132,10 +135,10 @@ class CountQuery(Resource):
     def post(self):
         # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
-        parse.add_argument('label',default=['body','label'],choices=['body','instance'])
+        parse.add_argument('label',choices=['body','instance'])
         args = parse.parse_args()
         res = q.count_query(args.label)
-        answer = {"code":200,"message":"success","data":res}
+        answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
 
 class OneHopQuery(Resource):
@@ -148,7 +151,7 @@ class OneHopQuery(Resource):
         parse.add_argument('label',type=str,default=None)
         args = parse.parse_args()
         res = q.one_hop_query(args.nodeId,args.label)
-        answer = {"code":200,"message":"success","data":res}
+        answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
 
 class ThreeHopQuery(Resource):
@@ -161,7 +164,7 @@ class ThreeHopQuery(Resource):
         parse.add_argument('label',type=str,default=None)
         args = parse.parse_args()
         res = q.three_hop_query(args.nodeId,args.label)
-        answer = {"code":200,"message":"success","data":res}
+        answer = {"code":200,"message":"","data":res}
         return jsonify(answer)      
 
 class ByAttributeQuery(Resource):
@@ -175,5 +178,5 @@ class ByAttributeQuery(Resource):
         parse.add_argument('label',type=str,default=None)
         args = parse.parse_args()
         res = q.by_attribute_query(args.attributeKey,args.attributeValue,args.label)
-        answer = {"code":200,"message":"success","data":res}
+        answer = {"code":200,"message":"","data":res}
         return jsonify(answer)      
