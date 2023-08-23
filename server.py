@@ -15,7 +15,10 @@ CORS(app, resources=r'/*',supports_credentials=True)
 
 api = Api(app)
 
+
 api.add_resource(LoadApi,'/loadNodeAndRelationToNeo4j')
+api.add_resource(GraphQuery,'/query/graphQuery')
+api.add_resource(TreeQuery,'/query/treeQuery')
 api.add_resource(CountQuery,'/query/countQuery')
 api.add_resource(OneHopQuery,'/query/oneHopQuery')
 api.add_resource(ThreeHopQuery,'/query/threeHopQuery')

@@ -4,6 +4,34 @@ class Query():
     def __init__(self) -> None:
         self.graph = Graph("http://localhost:7474/", auth=("neo4j", "123"))
 
+    #本体/实体图查询(一个站点)
+    def graph_query(self,label):
+        if label:
+            cypher = f'''MATCH (start:{label})
+                        OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
+                        RETURN start, r, end 
+                        '''
+        #若label为None,则查询所有节点
+        else:
+            cypher = f'''MATCH (start)
+                        WHERE start:body OR start:instance
+                        OPTIONAL MATCH (start)-[r:belong_to]->(end)
+                        RETURN start, r, end '''
+        return self.graph.run(cypher).data()
+
+    def tree_query(self,label,treeId):
+        if label:
+            cypher = f'''MATCH (start:{label})-[r:belong_to]->(end:{label})
+                        WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList
+                        RETURN start,r,end'''
+        else:
+            cypher = f'''MATCH (start)-[r:belong_to]->(end)
+                        WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList
+                        And start:body OR start:instance
+                        RETURN start,r,end'''
+
+        return self.graph.run(cypher).data()
+    
     #基于固定属性查询所有结点
     def by_attribute_query(self,attributeKey,attributeValue,label):
         cypher = f'''MATCH (n{":"+label if label else ""})
@@ -40,7 +68,7 @@ class Query():
 
 
     def shortest_path_query(self,startNodeId,endNodeId):
-        cypher =  '''MATCH (startNode {{nodeId: '{startNodeId}'}}), (endNode {{nodeId: '{endNodeId}'}})'''.format(startNodeId=startNodeId,endNodeId=endNodeId)+\
+        cypher = '''MATCH (startNode {{nodeId: '{startNodeId}'}}), (endNode {{nodeId: '{endNodeId}'}})'''.format(startNodeId=startNodeId,endNodeId=endNodeId)+\
                 '''MATCH shortestPath = shortestPath((startNode)-[*]-(endNode)) '''+\
                 '''RETURN shortestPath'''
         return self.graph.run(cypher).data()[0]

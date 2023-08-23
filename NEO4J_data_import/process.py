@@ -132,6 +132,7 @@ class Processor():
                                         apply(ast.literal_eval).\
                                         apply(lambda x: ",".join(x) if x!=[] else 'null')
         treeName = body_relation_df['treeName']
+        labelList = body_relation_df['labelList']
         #关系信息{'treeId':treeId,'treeName':treeName}
         # relationInfo = body_relation_df.apply(lambda row: {'treeId':row['treeId'],'treeName':row['name']}, axis=1)
         NNRelationList = body_relation_df['NNRelationList']
@@ -141,11 +142,11 @@ class Processor():
 
         #生成新的CSV文件
         arrays = np.array([start_id,relation_type,end_id,treeId,treeName,
-                           relationId,relationName,structureList,
+                           relationId,relationName,structureList,labelList,
                            NNRelationList,SSRelationList,SNRelationList,SNSRelationList
                           ]).T
         body_relation_df = pd.DataFrame(arrays,columns=['startId','relationType','endId','treeId',
-                                        'treeName','relationId','relationName','structureList',
+                                        'treeName','relationId','relationName','structureList','labelList',
                                         'NNRelationList','SSRelationList','SNRelationList','SNSRelationList'
                                         ])
         body_relation_df['startId'] = body_relation_df['startId'].map(lambda x : x.split('@')[1] if pd.notnull(x) else x)

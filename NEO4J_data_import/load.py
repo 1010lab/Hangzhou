@@ -120,7 +120,7 @@ class Loader():
                 relationType:line.relationType,
                 relationId:line.relationId,
                 relationName:line.relationName,
-                StructureList:COALESCE(line.structureList,'null'),
+                labelList:COALESCE(line.labelList,'null'),
                 treeId:split(line.treeId, ','),
                 treeName:COALESCE(line.treeName,'null')
             }}]-> (to)\n'''.format(relation="belong_to") +\
