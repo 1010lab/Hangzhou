@@ -120,11 +120,15 @@ class Processor():
         body_relation_df = pd.read_csv(self.relation_path+'//Body.csv')
         #获取NEO4J导入字段
         body_relation_df['relationType'] = body_relation_df['relationType'].astype(str).replace({'0': '00'})
+        body_relation_df['end'] = body_relation_df.apply(find_end, axis=1)
+        body_relation_df = body_relation_df.explode('end')
         relation_type = body_relation_df['relationType']
         #add_attribute()增加属性，返回增加属性后DataFrame
-        body_relation_df = add_attribute(body_relation_df)
+        # body_relation_df = add_attribute(body_relation_df)
         start_id = body_relation_df['siteNodeId']
-        end_id = body_relation_df['assSimpleSN']
+        #需要根据关系类型来查找对应的尾节点
+        end_id = body_relation_df['end']
+        # end_id = body_relation_df['assSimpleSN']
         relationId = body_relation_df['id']
         relationName = body_relation_df['name']
         structureList = body_relation_df['structureList']
@@ -133,21 +137,24 @@ class Processor():
                                         apply(lambda x: ",".join(x) if x!=[] else 'null')
         treeName = body_relation_df['treeName']
         labelList = body_relation_df['labelList']
+
         #关系信息{'treeId':treeId,'treeName':treeName}
         # relationInfo = body_relation_df.apply(lambda row: {'treeId':row['treeId'],'treeName':row['name']}, axis=1)
-        NNRelationList = body_relation_df['NNRelationList']
-        SSRelationList = body_relation_df['SSRelationList']
-        SNRelationList = body_relation_df['SNRelationList']
-        SNSRelationList = body_relation_df['SNSRelationList']
+        # NNRelationList = body_relation_df['NNRelationList']
+        # SSRelationList = body_relation_df['SSRelationList']
+        # SNRelationList = body_relation_df['SNRelationList']
+        # SNSRelationList = body_relation_df['SNSRelationList']
 
         #生成新的CSV文件
         arrays = np.array([start_id,relation_type,end_id,treeId,treeName,
-                           relationId,relationName,structureList,labelList,
-                           NNRelationList,SSRelationList,SNRelationList,SNSRelationList
+                           relationId,relationName,structureList,labelList 
                           ]).T
+        # arrays = np.array([start_id,relation_type,end_id,treeId,treeName,
+        #                    relationId,relationName,structureList,labelList,
+        #                    NNRelationList,SSRelationList,SNRelationList,SNSRelationList
+        #                   ]).T                  
         body_relation_df = pd.DataFrame(arrays,columns=['startId','relationType','endId','treeId',
-                                        'treeName','relationId','relationName','structureList','labelList',
-                                        'NNRelationList','SSRelationList','SNRelationList','SNSRelationList'
+                                        'treeName','relationId','relationName','structureList','labelList'
                                         ])
         body_relation_df['startId'] = body_relation_df['startId'].map(lambda x : x.split('@')[1] if pd.notnull(x) else x)
         body_relation_df['endId'] = body_relation_df['endId'].map(lambda x : x.split('@')[1] if pd.notnull(x) else x)
@@ -156,6 +163,19 @@ class Processor():
                         index=False,
                         encoding='utf-8',
                         )   
+
+def find_end(row):
+    if row['relationType'] == '10':
+        if row['assStaticSNList'] is not None:
+            sn_list = ast.literal_eval(row['assStaticSNList'])
+            sn_list.append(row['assSimpleSN'])
+            return sn_list
+        else: return []
+    if row['relationType'] == '11' :
+        sn_list = ast.literal_eval(row['assStaticSNList']) if pd.notnull(row['assStaticSNList']) else []
+        return sn_list
+    if row['relationType'] == '00':
+         return [row['assSimpleSN']] 
 
 #从虚拟树json数据中解析出所有的虚拟树TreeNode对象
 def get_tree(virtualTreeObject,nodeId,nodeName,func_name): 

@@ -58,7 +58,7 @@ class Loader():
         #导入节点
         logger.info('******导入程序已启动*******')
         #导入BODY的cypher语句
-        body_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+        body_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
                       '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args.siteID+'\\BODY.csv') +\
                       '''MERGE (n:{label} {{
                             nodeId:line.id,nodeName:line.node_name,
@@ -73,7 +73,7 @@ class Loader():
         body_res = self.graph.run(body_cypher).data()
         
         #导入BODY的cypher语句
-        instance_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+        instance_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
                           '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args["siteID"]+'\\INSTANCE.csv') +\
                           '''MERGE (n:{label} {{
                                 nodeId: COALESCE(line.id, -1),nodeName:line.node_name,
@@ -95,7 +95,7 @@ class Loader():
         self.result.node_info.append(f'导入实体节点:{len(instance_res)}')
         #导入BODY与INSTANCE关系的cypher语句
         relation2_filename = os.path.join(self.args["siteID"]+'/relation_b2i.csv')
-        relation2_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+        relation2_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
             '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=relation2_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
             '''MERGE (from)-[r:{relation}]-> (to)\n'''.format(relation="is_instance") +\
@@ -113,7 +113,7 @@ class Loader():
     def load_relation(self) -> Result:
         body_relation_filename = os.path.join(self.args["siteID"]+'/body_relation.csv')
         #导入BODY关系的cypher语句
-        body_relation_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+        body_relation_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
             '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=body_relation_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
             '''MERGE (from)-[r:{relation}{{
@@ -124,14 +124,6 @@ class Loader():
                 treeId:split(line.treeId, ','),
                 treeName:COALESCE(line.treeName,'null')
             }}]-> (to)\n'''.format(relation="belong_to") +\
-            '''SET r.NNRelationList = \n''' +\
-            '''CASE WHEN line.NNRelationList IS NOT NULL THEN line.NNRelationList ELSE NULL END\n''' +\
-            '''SET r.SSRelationList = \n''' +\
-            '''CASE WHEN line.SSRelationList IS NOT NULL THEN line.SSRelationList ELSE NULL END\n''' +\
-            '''SET r.SNRelationList = \n''' +\
-            '''CASE WHEN line.SNRelationList IS NOT NULL THEN line.SNRelationList ELSE NULL END\n''' +\
-            '''SET r.SNSRelationList = \n''' +\
-            '''CASE WHEN line.SNSRelationList IS NOT NULL THEN line.SNSRelationList ELSE NULL END\n''' +\
             '''RETURN r'''
         #运行cypher,body_relation_res记录返回关系r信息
         body_relation_res = self.graph.run(body_relation_cypher).data()
@@ -143,7 +135,7 @@ class Loader():
 
         instance_relation_filename = os.path.join(self.args["siteID"]+'/instance_relation.csv')
         #导入INSTANCE关系的cypher语句
-        instance_relation_cypher = '''USING PERIODIC COMMIT 500\n'''+\
+        instance_relation_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
             '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
             '''MERGE (from)-[r:{relation}{{relationId:line.relationId}}]-> (to)\n'''.format(relation="belong_to") +\
@@ -157,6 +149,12 @@ class Loader():
         self.result.relation_info.append(f'导入实例关系:{len(instance_relation_res)}')
         return self.result
     
+    def set_siteId(self):
+        cypher1 = f'''MATCH ()-[r]->() SET r.siteID = "{self.args["siteID"]}"'''
+        self.graph.run(cypher1)
+        cypher2 = f'''MATCH (n) SET n.siteID = "{self.args["siteID"]}"'''
+        self.graph.run(cypher2)
+
     def tree_relation(self,tree,type):
         rel_num = 0
         treeId = tree.treeId

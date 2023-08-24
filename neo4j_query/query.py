@@ -1,4 +1,6 @@
 from py2neo import Graph
+import time
+
 
 class Query():
     def __init__(self) -> None:
@@ -6,6 +8,7 @@ class Query():
 
     #本体/实体图查询(一个站点)
     def graph_query(self,label):
+        print(time.ctime())
         if label:
             cypher = f'''MATCH (start:{label})
                         OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
@@ -17,7 +20,12 @@ class Query():
                         WHERE start:body OR start:instance
                         OPTIONAL MATCH (start)-[r:belong_to]->(end)
                         RETURN start, r, end '''
-        return self.graph.run(cypher).data()
+        tmp = self.graph.run(cypher)
+        print(time.ctime())
+        data = tmp.to_table()
+        print(data)
+        print(time.ctime())
+        return data
 
     def tree_query(self,label,treeId):
         if label:

@@ -1,6 +1,7 @@
 from flask import jsonify
 from neo4j_query.query import Query
 from flask_restful import Resource,reqparse
+import time
 
 q = Query()
 
@@ -42,9 +43,9 @@ class GraphQuery(Resource):
     def _convert_data(self,data):
         #查询结果进行处理，处理成前段需要的格式
         for record in data:
-            start_node = record['start']
-            relation = record['r']
-            end_node = record['end']
+            start_node = record['start'].__dict__['_properties']
+            relation = record['r'].__dict__['_properties']
+            end_node = record['end'].__dict__['_properties']
             self.add_node(start_node)
             
             if relation is not None:
@@ -59,8 +60,11 @@ class GraphQuery(Resource):
         #添加参数label用于指定节点便签，当没有指定是默认为None
         parse.add_argument('label',choices=['body','instance'])
         args = parse.parse_args()
+        print(time.ctime())
         res = q.graph_query(args.label)
+        print(time.ctime())
         self._convert_data(res)
+        print(time.ctime())
         answer = {"code":200,"message":"success","data":{"nodes":self.nodes,
                                                         "lines":self.lines}}
         return jsonify(answer)
