@@ -54,7 +54,7 @@ class Processor():
         node_df = get_dataframe(self.node_path)
         self.get_body2instance(node_df)
         #获取NEO4J导入字段
-        id = node_df['id'].map(lambda x : x.split('@')[1])
+        id = node_df['id'].map(lambda x : x.replace('@','/'))
         node_name = node_df['nodeName']
         label = node_df['attribute']
         type = node_df['type']
@@ -156,8 +156,8 @@ class Processor():
         body_relation_df = pd.DataFrame(arrays,columns=['startId','relationType','endId','treeId',
                                         'treeName','relationId','relationName','structureList','labelList'
                                         ])
-        body_relation_df['startId'] = body_relation_df['startId'].map(lambda x : x.split('@')[1] if pd.notnull(x) else x)
-        body_relation_df['endId'] = body_relation_df['endId'].map(lambda x : x.split('@')[1] if pd.notnull(x) else x)
+        body_relation_df['startId'] = body_relation_df['startId'].map(lambda x : x.replace('@','/') if pd.notnull(x) else x)
+        body_relation_df['endId'] = body_relation_df['endId'].map(lambda x : x.replace('@','/') if pd.notnull(x) else x)
         body_relation_df.to_csv(
                         os.path.join(self.data_dir,'body_relation.csv'),
                         index=False,

@@ -25,5 +25,5 @@ api.add_resource(ThreeHopQuery,'/query/threeHopQuery')
 api.add_resource(ByAttributeQuery,'/query/byAttributeQuery')
 
 if __name__=='__main__':
-    app.run(host="0.0.0.0",threaded=True)
+    app.run(host="0.0.0.0",threaded=True,debug=True)
     # server.serve_forever()

@@ -1,9 +1,9 @@
-from py2neo import Graph,Node,Relationship
-import pandas as pd 
+from py2neo import Graph
 import os
 import shutil
 import logging
 from tree import create_relation
+from neo4j import GraphDatabase
 
 #自定义logger对象，用于记录load的操作日志 
 logger = logging.getLogger(__name__)
@@ -38,6 +38,11 @@ class Loader():
     def __init__(self,args) -> None:
         self.graph = Graph("http://localhost:7474/", auth=("neo4j", "123"))
         self.graph.delete_all()
+        URI = "neo4j://localhost"
+        AUTH = ("neo4j", "123")
+        with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
+            self.driver.verify_connectivity()
+
         self.args = args
         self.result = Result()
         self.import_dir = os.path.join(args["NEO4J_PATH"],'import\\'+args["siteID"])
@@ -58,8 +63,7 @@ class Loader():
         #导入节点
         logger.info('******导入程序已启动*******')
         #导入BODY的cypher语句
-        body_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
-                      '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args.siteID+'\\BODY.csv') +\
+        body_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args.siteID+'\\BODY.csv') +\
                       '''MERGE (n:{label} {{
                             nodeId:line.id,nodeName:line.node_name,
                             snType:line.sn_type,type:COALESCE(line.type,[]) ,
@@ -70,11 +74,14 @@ class Loader():
                         }})\n'''.format(label='body') +\
                        '''return n'''
         #运行cypher,body_res记录返回结点n信息
-        body_res = self.graph.run(body_cypher).data()
+        records,summary,keys = self.driver.execute_query(
+                body_cypher,
+                database_="neo4j",
+            )               
+        body_res = len(records)
         
         #导入BODY的cypher语句
-        instance_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
-                          '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args["siteID"]+'\\INSTANCE.csv') +\
+        instance_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args["siteID"]+'\\INSTANCE.csv') +\
                           '''MERGE (n:{label} {{
                                 nodeId: COALESCE(line.id, -1),nodeName:line.node_name,
                                 snType:line.sn_type,type:COALESCE(line.type,'null'),
@@ -84,37 +91,43 @@ class Loader():
                                 labelColList:split(line.labelColList,',')
                             }})\n'''.format(label='instance') +\
                           '''return n'''
-        #运行cypher,instance_res记录返回结点n信息                  
-        instance_res = self.graph.run(instance_cypher).data()
+        #运行cypher,instance_res记录返回结点n信息
+        records,summary,keys = self.driver.execute_query(
+                instance_cypher,
+                database_="neo4j",
+            )                    
+        instance_res = len(records)
         logger.info('导入节点成功')
-        logger.debug(f'导入本体节点:{len(body_res)}')
-        logger.debug(f'导入实体节点:{len(instance_res)}')
+        logger.debug(f'导入本体节点:{body_res}')
+        logger.debug(f'导入实体节点:{instance_res}')
         #记录导入节点信息
-        self.result.node_num += len(body_res) + len(instance_res)
-        self.result.node_info.append(f'导入本体节点:{len(body_res)}')
-        self.result.node_info.append(f'导入实体节点:{len(instance_res)}')
+        self.result.node_num += body_res + instance_res
+        self.result.node_info.append(f'导入本体节点:{body_res}')
+        self.result.node_info.append(f'导入实体节点:{instance_res}')
         #导入BODY与INSTANCE关系的cypher语句
         relation2_filename = os.path.join(self.args["siteID"]+'/relation_b2i.csv')
-        relation2_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
-            '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=relation2_filename) +\
+        relation2_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=relation2_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
             '''MERGE (from)-[r:{relation}]-> (to)\n'''.format(relation="is_instance") +\
             '''RETURN r'''
         #运行cypher,b2i_res记录返回关系r信息
-        b2i_res = self.graph.run(relation2_cypher).data()
+        records,summary,keys = self.driver.execute_query(
+                relation2_cypher,
+                database_="neo4j",
+            )     
+        b2i_res = len(records)
         logger.info('导入实体与实例关系成功')
-        logger.debug(f'导入实体-实例关系:{len(b2i_res)}')
+        logger.debug(f'导入实体-实例关系:{b2i_res}')
         #记录导入关系信息
-        self.result.relation_num += len(b2i_res)
-        self.result.relation_info.append(f'导入实体-实例关系:{len(b2i_res)}')
+        self.result.relation_num += b2i_res
+        self.result.relation_info.append(f'导入实体-实例关系:{b2i_res}')
         return self.result
         
 
     def load_relation(self) -> Result:
         body_relation_filename = os.path.join(self.args["siteID"]+'/body_relation.csv')
         #导入BODY关系的cypher语句
-        body_relation_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
-            '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=body_relation_filename) +\
+        body_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=body_relation_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
             '''MERGE (from)-[r:{relation}{{
                 relationType:line.relationType,
@@ -126,33 +139,44 @@ class Loader():
             }}]-> (to)\n'''.format(relation="belong_to") +\
             '''RETURN r'''
         #运行cypher,body_relation_res记录返回关系r信息
-        body_relation_res = self.graph.run(body_relation_cypher).data()
+        records,summary,keys = self.driver.execute_query(
+                body_relation_cypher,
+                database_="neo4j",
+            )
+        body_relation_res = len(records)
         logger.info('导入实体关系成功')
-        logger.debug(f'导入实体关系:{len(body_relation_res)}')
+        logger.debug(f'导入实体关系:{body_relation_res}')
         #记录导入关系信息
-        self.result.relation_num += len(body_relation_res)
-        self.result.relation_info.append(f'导入实体关系:{len(body_relation_res)}')
+        self.result.relation_num += body_relation_res
+        self.result.relation_info.append(f'导入实体关系:{body_relation_res}')
 
         instance_relation_filename = os.path.join(self.args["siteID"]+'/instance_relation.csv')
         #导入INSTANCE关系的cypher语句
-        instance_relation_cypher = '''USING PERIODIC COMMIT 2000\n'''+\
-            '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
+        instance_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
             '''MERGE (from)-[r:{relation}{{relationId:line.relationId}}]-> (to)\n'''.format(relation="belong_to") +\
             '''RETURN r'''
         #运行cypher,instance_relation_res记录返回关系r信息
-        instance_relation_res = self.graph.run(instance_relation_cypher).data()
+        records,summary,keys = self.driver.execute_query(
+                instance_relation_cypher,
+                database_="neo4j",
+            )
+        instance_relation_res = len(records)
         logger.info('导入实例关系成功')
-        logger.debug(f'导入实例关系:{len(instance_relation_res)}')
+        logger.debug(f'导入实例关系:{instance_relation_res}')
         #记录导入关系信息
-        self.result.relation_num += len(instance_relation_res)
-        self.result.relation_info.append(f'导入实例关系:{len(instance_relation_res)}')
+        self.result.relation_num += instance_relation_res
+        self.result.relation_info.append(f'导入实例关系:{instance_relation_res}')
         return self.result
     
     def set_siteId(self):
-        cypher1 = f'''MATCH ()-[r]->() SET r.siteID = "{self.args["siteID"]}"'''
+        cypher1 = f'''MATCH ()-[r]->()
+                    WHERE NOT EXISTS(r.siteID) 
+                    SET r.siteID = "{self.args["siteID"]}"'''
         self.graph.run(cypher1)
-        cypher2 = f'''MATCH (n) SET n.siteID = "{self.args["siteID"]}"'''
+        cypher2 = f'''MATCH (n)
+                    WHERE NOT EXISTS(n.siteID)
+                    SET n.siteID = "{self.args["siteID"]}"'''
         self.graph.run(cypher2)
 
     def tree_relation(self,tree,type):

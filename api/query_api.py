@@ -5,6 +5,8 @@ import time
 
 q = Query()
 
+
+
 class GraphQuery(Resource):
     def __init__(self) -> None:
         self.nodes = []
@@ -15,13 +17,14 @@ class GraphQuery(Resource):
     #添加node信息
     def add_node(self,node):
         node_dict ={}
-        node_dict["id"] = node['nodeId']
+        properties = node.__dict__['_properties']
+        node_dict["id"] = properties['nodeId']
         #如果该id存在，则不添加
-        if self.find(node['nodeId']):
+        if self.find(properties['nodeId']):
             return
-        node_dict["text"]  = node["nodeName"]
-        node_dict["info"]  = {"type":node["type"],
-                            "snType":node["snType"],
+        node_dict["text"]  = properties["nodeName"]
+        node_dict["info"]  = {"type":properties["type"],
+                            "snType":properties["snType"],
                             "defaultColor":"default"}
         self.nodes.append(node_dict)
         self.nodes_id.append(node['nodeId'])
@@ -29,11 +32,12 @@ class GraphQuery(Resource):
     #添加line信息
     def add_relation(self,start_node,relation,end_node):
         line_dict = {}
-        line_dict["id"] = relation["relationId"]
-        line_dict["from"] = start_node["nodeId"]
-        line_dict["to"] = end_node["nodeId"]
-        line_dict["info"]  = {"relationType":relation["relationType"],
-                            "treeId":relation["treeId"],
+        properties = relation.__dict__['_properties']
+        line_dict["id"] = properties["relationId"]
+        line_dict["from"] = start_node.__dict__['_properties']["nodeId"]
+        line_dict["to"] = end_node.__dict__['_properties']["nodeId"]
+        line_dict["info"]  = {"relationType":properties["relationType"],
+                            "treeId":properties["treeId"],
                             "labelList":"未导入部分"}
         self.lines.append(line_dict)
 
@@ -43,9 +47,9 @@ class GraphQuery(Resource):
     def _convert_data(self,data):
         #查询结果进行处理，处理成前段需要的格式
         for record in data:
-            start_node = record['start'].__dict__['_properties']
-            relation = record['r'].__dict__['_properties']
-            end_node = record['end'].__dict__['_properties']
+            start_node = record['start']
+            relation = record['r']
+            end_node = record['end']
             self.add_node(start_node)
             
             if relation is not None:
@@ -60,11 +64,8 @@ class GraphQuery(Resource):
         #添加参数label用于指定节点便签，当没有指定是默认为None
         parse.add_argument('label',choices=['body','instance'])
         args = parse.parse_args()
-        print(time.ctime())
         res = q.graph_query(args.label)
-        print(time.ctime())
         self._convert_data(res)
-        print(time.ctime())
         answer = {"code":200,"message":"success","data":{"nodes":self.nodes,
                                                         "lines":self.lines}}
         return jsonify(answer)
@@ -79,13 +80,14 @@ class TreeQuery(Resource):
     #添加node信息
     def add_node(self,node):
         node_dict ={}
-        node_dict["id"] = node['nodeId']
+        properties = node.__dict__['_properties']
+        node_dict["id"] = properties['nodeId']
         #如果该id存在，则不添加
-        if self.find(node['nodeId']):
+        if self.find(properties['nodeId']):
             return
-        node_dict["text"]  = node["nodeName"]
-        node_dict["info"]  = {"type":node["type"],
-                            "snType":node["snType"],
+        node_dict["text"]  = properties["nodeName"]
+        node_dict["info"]  = {"type":properties["type"],
+                            "snType":properties["snType"],
                             "defaultColor":"default"}
         self.nodes.append(node_dict)
         self.nodes_id.append(node['nodeId'])
@@ -93,19 +95,19 @@ class TreeQuery(Resource):
     #添加line信息
     def add_relation(self,start_node,relation,end_node):
         line_dict = {}
-        line_dict["id"] = relation["relationId"]
-        line_dict["from"] = start_node["nodeId"]
-        line_dict["to"] = end_node["nodeId"]
-        line_dict["info"]  = {"relationType":relation["relationType"],
-                        "treeId":relation["treeId"],
-                        "labelList":"未导入部分"}
+        properties = relation.__dict__['_properties']
+        line_dict["id"] = properties["relationId"]
+        line_dict["from"] = start_node.__dict__['_properties']["nodeId"]
+        line_dict["to"] = end_node.__dict__['_properties']["nodeId"]
+        line_dict["info"]  = {"relationType":properties["relationType"],
+                            "treeId":properties["treeId"],
+                            "labelList":"未导入部分"}
         self.lines.append(line_dict)
 
     def find(self,id):
         return True if id in self.nodes_id else False
 
     def _convert_data(self,data):
-        
         #查询结果进行处理，处理成前段需要的格式
         for record in data:
             start_node = record['start']
