@@ -9,44 +9,50 @@ class Query():
 
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
+    
+    def _run(self,cypher):
+        records,summary,keys = self.driver.execute_query(
+                cypher,
+                database_="neo4j",
+            )               
+        return list(records)
 
     #本体/实体图查询(一个站点)
-    def graph_query(self,label):
+    def graph_query(self,label,siteID):
         if label:
             cypher = f'''MATCH (start:{label})
+                        WHERE start.siteID = '{siteID}'
                         OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
+                        WHERE start.siteID = '{siteID}'
                         RETURN start, r, end 
                         '''
         #若label为None,则查询所有节点
         else:
             cypher = f'''MATCH (start)
-                        WHERE start:body OR start:instance
+                        WHERE (start:body OR start:instance) AND start.siteID = '{siteID}'
                         OPTIONAL MATCH (start)-[r:belong_to]->(end)
+                        WHERE start.siteID = '{siteID}'
                         RETURN start, r, end '''
+        return self._run(cypher)
 
-        records,summary,keys = self.driver.execute_query(
-                cypher,
-                database_="neo4j",
-            )               
-        return list(records)
-
-    def tree_query(self,label,treeId):
+    def tree_query(self,label,treeId,siteID):
         if label:
-            cypher = f'''MATCH (start:{label})-[r:belong_to]->(end:{label})
-                        WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList
-                        RETURN start,r,end'''
+            cypher = '''MATCH (start:{label}{{siteID:'{siteID}'}})-[r:belong_to]->(end:{label})'''.format(label=label,siteID=siteID)+\
+                    '''WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList'''.format(treeId=treeId)+\
+                    '''RETURN start,r,end'''
         else:
             cypher = f'''MATCH (start)-[r:belong_to]->(end)
                         WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList
                         And start:body OR start:instance
                         RETURN start,r,end'''
+        return self._run(cypher)
+        
+    def set_default_color(self,nodeId,color):
+        cypher = f'''MATCH (m) WHERE m.nodeId = '{nodeId}' 
+                    SET m.defaultColor = '{color}'
+                    RETURN m'''
+        return self._run(cypher)
 
-        records,summary,keys = self.driver.execute_query(
-                cypher,
-                database_="neo4j",
-            )               
-        return list(records)
-    
     #基于固定属性查询所有结点
     def by_attribute_query(self,attributeKey,attributeValue,label):
         cypher = f'''MATCH (n{":"+label if label else ""})

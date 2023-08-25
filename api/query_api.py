@@ -25,7 +25,7 @@ class GraphQuery(Resource):
         node_dict["text"]  = properties["nodeName"]
         node_dict["info"]  = {"type":properties["type"],
                             "snType":properties["snType"],
-                            "defaultColor":"default"}
+                            "defaultColor":properties['defaultColor'] if properties.get('defaultColor') else "RGBA(255, 255, 255, 1)"}
         self.nodes.append(node_dict)
         self.nodes_id.append(node['nodeId'])
 
@@ -37,7 +37,7 @@ class GraphQuery(Resource):
         line_dict["from"] = start_node.__dict__['_properties']["nodeId"]
         line_dict["to"] = end_node.__dict__['_properties']["nodeId"]
         line_dict["info"]  = {"relationType":properties["relationType"],
-                            "treeId":properties["treeId"],
+                            "treeId":properties["treeId"] if properties.get("treeId") else None,
                             "labelList":"未导入部分"}
         self.lines.append(line_dict)
 
@@ -63,8 +63,9 @@ class GraphQuery(Resource):
         parse = reqparse.RequestParser()
         #添加参数label用于指定节点便签，当没有指定是默认为None
         parse.add_argument('label',choices=['body','instance'])
+        parse.add_argument('siteId',required=True)
         args = parse.parse_args()
-        res = q.graph_query(args.label)
+        res = q.graph_query(args.label,args.siteId)
         self._convert_data(res)
         answer = {"code":200,"message":"success","data":{"nodes":self.nodes,
                                                         "lines":self.lines}}
@@ -126,11 +127,22 @@ class TreeQuery(Resource):
         parse = reqparse.RequestParser()
         parse.add_argument('label',choices=['body','instance'])
         parse.add_argument('treeId',required=True)
+        parse.add_argument('siteID',required=True)
         args = parse.parse_args()
-        res = q.tree_query(args.label,args.treeId)
+        res = q.tree_query(args.label,args.treeId,args.siteID)
         self._convert_data(res)
         answer = {"code":200,"message":"","data":{"nodes":self.nodes,
                                                         "lines":self.lines}}
+        return jsonify(answer)
+
+class SetDefaultColor(Resource):
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('nodeId',required=True)
+        parse.add_argument('color',required=True)
+        args = parse.parse_args()
+        res = q.set_default_color(args.nodeId,args.color)
+        answer = {"code":200,"message":"","data":args.color}
         return jsonify(answer)
 
 class CountQuery(Resource):

@@ -37,12 +37,11 @@ class Result():
 class Loader():
     def __init__(self,args) -> None:
         self.graph = Graph("http://localhost:7474/", auth=("neo4j", "123"))
-        self.graph.delete_all()
         URI = "neo4j://localhost"
         AUTH = ("neo4j", "123")
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
-
+        self.graph.delete_all()
         self.args = args
         self.result = Result()
         self.import_dir = os.path.join(args["NEO4J_PATH"],'import\\'+args["siteID"])
@@ -79,7 +78,7 @@ class Loader():
                 database_="neo4j",
             )               
         body_res = len(records)
-        
+        logger.debug(f'导入本体节点:{body_res},导入时间:{summary.result_available_after}ms')
         #导入BODY的cypher语句
         instance_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args["siteID"]+'\\INSTANCE.csv') +\
                           '''MERGE (n:{label} {{
@@ -97,9 +96,8 @@ class Loader():
                 database_="neo4j",
             )                    
         instance_res = len(records)
+        logger.debug(f'导入实体节点:{instance_res},导入时间:{summary.result_available_after}ms')
         logger.info('导入节点成功')
-        logger.debug(f'导入本体节点:{body_res}')
-        logger.debug(f'导入实体节点:{instance_res}')
         #记录导入节点信息
         self.result.node_num += body_res + instance_res
         self.result.node_info.append(f'导入本体节点:{body_res}')
@@ -117,7 +115,7 @@ class Loader():
             )     
         b2i_res = len(records)
         logger.info('导入实体与实例关系成功')
-        logger.debug(f'导入实体-实例关系:{b2i_res}')
+        logger.debug(f'导入实体-实例关系:{b2i_res},导入时间:{summary.result_available_after}ms')
         #记录导入关系信息
         self.result.relation_num += b2i_res
         self.result.relation_info.append(f'导入实体-实例关系:{b2i_res}')
@@ -145,7 +143,7 @@ class Loader():
             )
         body_relation_res = len(records)
         logger.info('导入实体关系成功')
-        logger.debug(f'导入实体关系:{body_relation_res}')
+        logger.debug(f'导入实体关系:{body_relation_res},导入时间:{summary.result_available_after}ms')
         #记录导入关系信息
         self.result.relation_num += body_relation_res
         self.result.relation_info.append(f'导入实体关系:{body_relation_res}')
@@ -154,7 +152,10 @@ class Loader():
         #导入INSTANCE关系的cypher语句
         instance_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
-            '''MERGE (from)-[r:{relation}{{relationId:line.relationId}}]-> (to)\n'''.format(relation="belong_to") +\
+            '''MERGE (from)-[r:{relation}{{
+                relationId:line.relationId,
+                bodyRelationId:COALESCE(line.bodyRelationId,'null')
+                }}]-> (to)\n'''.format(relation="belong_to") +\
             '''RETURN r'''
         #运行cypher,instance_relation_res记录返回关系r信息
         records,summary,keys = self.driver.execute_query(
@@ -163,10 +164,17 @@ class Loader():
             )
         instance_relation_res = len(records)
         logger.info('导入实例关系成功')
-        logger.debug(f'导入实例关系:{instance_relation_res}')
+        logger.debug(f'导入实例关系:{instance_relation_res},导入时间:{summary.result_available_after}ms')
         #记录导入关系信息
         self.result.relation_num += instance_relation_res
         self.result.relation_info.append(f'导入实例关系:{instance_relation_res}')
+        rel_type_cypher = '''MATCH (:instance)-[r1]->(:instance)
+                        WITH r1,r1.bodyRelationId AS id
+                        MATCH (:body)-[r2]-(:body)
+                        WhERE r2.relationId = id
+                        SET r1.relationType = r2.relationType
+                        RETURN r1'''
+        self.driver.execute_query(rel_type_cypher,database_="neo4j")
         return self.result
     
     def set_siteId(self):
@@ -194,12 +202,6 @@ class Loader():
             for body_node in root_node:
                 body_node = body_node['n']
                 create_relation(body_node,'is_root',tree_node,self.graph)
-            logger.info('导入虚拟树节点成功')
-            self.result.node_num += rel_num
-            self.result.node_info.append(f'导入虚拟树节点:{rel_num}')
-            logger.debug(f'导入虚拟树关系:{rel_num}')
-            self.result.relation_num += rel_num
-            self.result.relation_info.append(f'导入虚拟树关系:{rel_num}')   
 
         #建立标签与节点间的关系
         if(type == 'labelCollection'):

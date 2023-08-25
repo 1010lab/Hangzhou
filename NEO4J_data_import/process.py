@@ -37,9 +37,9 @@ class Processor():
     def get_body2instance(self,df):
         df = df[df['bodySiteNodeId'].notna()]
         #头节点ID
-        start_id =  df['id'].map(lambda x : x.split('@')[1])
+        start_id =  df['id'].map(lambda x : x.replace('@','/'))
         #尾节点ID
-        end_id = df['bodySiteNodeId'].map(lambda x : x.split('@')[1])
+        end_id = df['bodySiteNodeId'].map(lambda x : x.replace('@','/'))
         #生成新的CSV文件
         arrays = np.array([start_id,end_id]).T
         df = pd.DataFrame(arrays,columns=['startId','endId'])
@@ -107,8 +107,8 @@ class Processor():
                                                              'virtualTreeList','bodyRelationId'
                                                          ])
         #ID处理成结点后24位ID
-        instance_relation_df['startId'] = instance_relation_df['startId'].map(lambda x: x.split('@')[1] if pd.notnull(x) else x)
-        instance_relation_df['pid'] = instance_relation_df['pid'].map(lambda x: x.split('@')[1] if pd.notnull(x) else x)
+        instance_relation_df['startId'] = instance_relation_df['startId'].map(lambda x: x.replace('@','/') if pd.notnull(x) else x)
+        instance_relation_df['pid'] = instance_relation_df['pid'].map(lambda x: x.replace('@','/') if pd.notnull(x) else x)
 
         instance_relation_df.to_csv(
             os.path.join(self.data_dir, 'instance_relation.csv'),

@@ -23,6 +23,7 @@ api.add_resource(CountQuery,'/query/countQuery')
 api.add_resource(OneHopQuery,'/query/oneHopQuery')
 api.add_resource(ThreeHopQuery,'/query/threeHopQuery')
 api.add_resource(ByAttributeQuery,'/query/byAttributeQuery')
+api.add_resource(SetDefaultColor,'/query/setDefaultColor')
 
 if __name__=='__main__':
     app.run(host="0.0.0.0",threaded=True,debug=True)
