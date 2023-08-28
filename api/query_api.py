@@ -5,9 +5,7 @@ import time
 
 q = Query()
 
-
-
-class GraphQuery(Resource):
+class Converter():
     def __init__(self) -> None:
         self.nodes = []
         self.lines = []
@@ -43,19 +41,33 @@ class GraphQuery(Resource):
 
     def find(self,id):
         return True if id in self.nodes_id else False
+    
+    def clear(self):
+        self.nodes = []
+        self.lines = []
+
+
+class GraphQuery(Resource):
+    def __init__(self) -> None:
+        self.convert = Converter()
+        self.items = []
+        self.res = {}
+   
 
     def _convert_data(self,data):
         #查询结果进行处理，处理成前段需要的格式
-        for record in data:
-            start_node = record['start']
-            relation = record['r']
-            end_node = record['end']
-            self.add_node(start_node)
-            
-            if relation is not None:
-                self.add_relation(start_node,relation,end_node)
-                self.add_node(end_node)
-        
+        for page,records in data.items():
+            for record in records:
+                start_node = record['start']
+                relation = record['r']
+                end_node = record['end']
+                self.convert.add_node(start_node)
+                
+                if relation is not None:
+                    self.convert.add_relation(start_node,relation,end_node)
+                    self.convert.add_node(end_node)
+            self.items.append({"page":page,"nodes":self.convert.nodes, "lines":self.convert.lines})
+            self.convert.clear()
 
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
@@ -63,63 +75,36 @@ class GraphQuery(Resource):
         parse = reqparse.RequestParser()
         #添加参数label用于指定节点便签，当没有指定是默认为None
         parse.add_argument('label',choices=['body','instance'])
-        parse.add_argument('siteId',required=True)
+        parse.add_argument('siteID',required=True)
+        parse.add_argument('pageSize',type=int)
         args = parse.parse_args()
-        res = q.graph_query(args.label,args.siteId)
+        res = q.graph_query(args.label,args.siteID,args.pageSize)
         self._convert_data(res)
-        answer = {"code":200,"message":"success","data":{"nodes":self.nodes,
-                                                        "lines":self.lines}}
+        answer = {"code":200,"message":"success","data":self.items}
         return jsonify(answer)
 
 class TreeQuery(Resource):
     def __init__(self) -> None:
-        self.nodes = []
-        self.lines = []
-        #维护一个列表来查看哪些node已经添加到self.nodes里了
-        self.nodes_id = []
-        
-    #添加node信息
-    def add_node(self,node):
-        node_dict ={}
-        properties = node.__dict__['_properties']
-        node_dict["id"] = properties['nodeId']
-        #如果该id存在，则不添加
-        if self.find(properties['nodeId']):
-            return
-        node_dict["text"]  = properties["nodeName"]
-        node_dict["info"]  = {"type":properties["type"],
-                            "snType":properties["snType"],
-                            "defaultColor":"default"}
-        self.nodes.append(node_dict)
-        self.nodes_id.append(node['nodeId'])
-
-    #添加line信息
-    def add_relation(self,start_node,relation,end_node):
-        line_dict = {}
-        properties = relation.__dict__['_properties']
-        line_dict["id"] = properties["relationId"]
-        line_dict["from"] = start_node.__dict__['_properties']["nodeId"]
-        line_dict["to"] = end_node.__dict__['_properties']["nodeId"]
-        line_dict["info"]  = {"relationType":properties["relationType"],
-                            "treeId":properties["treeId"],
-                            "labelList":"未导入部分"}
-        self.lines.append(line_dict)
-
-    def find(self,id):
-        return True if id in self.nodes_id else False
+        self.convert = Converter()
+        self.items = []
+        self.res = {}
+   
 
     def _convert_data(self,data):
         #查询结果进行处理，处理成前段需要的格式
-        for record in data:
-            start_node = record['start']
-            relation = record['r']
-            end_node = record['end']
-            self.add_node(start_node)
-            
-            if relation is not None:
-                self.add_relation(start_node,relation,end_node)
-                self.add_node(end_node)
-        
+        for page,records in data.items():
+            for record in records:
+                start_node = record['start']
+                relation = record['r']
+                end_node = record['end']
+                self.convert.add_node(start_node)
+                
+                if relation is not None:
+                    self.convert.add_relation(start_node,relation,end_node)
+                    self.convert.add_node(end_node)
+            self.items.append({"page":page,"nodes":self.convert.nodes, "lines":self.convert.lines})
+            self.convert.clear()
+
 
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
@@ -128,11 +113,11 @@ class TreeQuery(Resource):
         parse.add_argument('label',choices=['body','instance'])
         parse.add_argument('treeId',required=True)
         parse.add_argument('siteID',required=True)
+        parse.add_argument('pageSize',type=int)
         args = parse.parse_args()
-        res = q.tree_query(args.label,args.treeId,args.siteID)
+        res = q.tree_query(args.label,args.treeId,args.siteID,args.pageSize)
         self._convert_data(res)
-        answer = {"code":200,"message":"","data":{"nodes":self.nodes,
-                                                        "lines":self.lines}}
+        answer = {"code":200,"message":"success","data":self.items}
         return jsonify(answer)
 
 class SetDefaultColor(Resource):

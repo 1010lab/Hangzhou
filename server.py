@@ -25,6 +25,8 @@ api.add_resource(ThreeHopQuery,'/query/threeHopQuery')
 api.add_resource(ByAttributeQuery,'/query/byAttributeQuery')
 api.add_resource(SetDefaultColor,'/query/setDefaultColor')
 
+#额外的
+
 if __name__=='__main__':
-    app.run(host="0.0.0.0",threaded=True,debug=True)
+    app.run(host="0.0.0.0",threaded=True)
     # server.serve_forever()

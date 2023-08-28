@@ -18,34 +18,57 @@ class Query():
         return list(records)
 
     #本体/实体图查询(一个站点)
-    def graph_query(self,label,siteID):
-        if label:
-            cypher = f'''MATCH (start:{label})
-                        WHERE start.siteID = '{siteID}'
-                        OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
-                        WHERE start.siteID = '{siteID}'
-                        RETURN start, r, end 
-                        '''
-        #若label为None,则查询所有节点
-        else:
-            cypher = f'''MATCH (start)
-                        WHERE (start:body OR start:instance) AND start.siteID = '{siteID}'
-                        OPTIONAL MATCH (start)-[r:belong_to]->(end)
-                        WHERE start.siteID = '{siteID}'
-                        RETURN start, r, end '''
-        return self._run(cypher)
+    #定义一个带有分页功能的图查询
+    def graph_query(self,label,siteID,page_size=10):
+        pages = {}
+        count = 0
+        while True:
+            if label:
+                cypher = f'''MATCH (start:{label})
+                            WHERE start.siteID = '{siteID}'
+                            OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
+                            WHERE start.siteID = '{siteID}'
+                            RETURN start, r, end 
+                            SKIP {count}
+                            LIMIT {page_size}
+                            '''
+            #若label为None,则查询所有节点
+            else:
+                cypher = f'''MATCH (start)
+                            WHERE (start:body OR start:instance) AND start.siteID = '{siteID}'
+                            OPTIONAL MATCH (start)-[r:belong_to]->(end)
+                            WHERE start.siteID = '{siteID}'
+                            RETURN start, r, end 
+                            SKIP {count}
+                            LIMIT {page_size}'''
+            records = self._run(cypher)
+            if(len(records) == 0): break   
+            pages[int(count/page_size)] = records
+            count += page_size
+        return pages
 
-    def tree_query(self,label,treeId,siteID):
-        if label:
-            cypher = '''MATCH (start:{label}{{siteID:'{siteID}'}})-[r:belong_to]->(end:{label})'''.format(label=label,siteID=siteID)+\
-                    '''WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList'''.format(treeId=treeId)+\
-                    '''RETURN start,r,end'''
-        else:
-            cypher = f'''MATCH (start)-[r:belong_to]->(end)
-                        WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList
-                        And start:body OR start:instance
-                        RETURN start,r,end'''
-        return self._run(cypher)
+    def tree_query(self,label,treeId,siteID,page_size):
+        pages = {}
+        count = 0
+        while True:
+            if label:
+                cypher = '''MATCH (start:{label}{{siteID:'{siteID}'}})-[r:belong_to]->(end:{label})\n'''.format(label=label,siteID=siteID)+\
+                        '''WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList\n'''.format(treeId=treeId)+\
+                        '''RETURN start,r,end\n'''+\
+                        '''SKIP {count}\n'''.format(count= count)+\
+                        '''LIMIT {page_size}'''.format(page_size= page_size)
+            else:
+                cypher = f'''MATCH (start)-[r:belong_to]->(end)
+                            WHERE "{treeId}"  IN start.virtualTreeList AND "{treeId}" in end.virtualTreeList
+                            And start:body OR start:instance
+                            RETURN start,r,end 
+                            SKIP {count}
+                            LIMIT {page_size}'''
+            records = self._run(cypher)
+            if(len(records) == 0): break   
+            pages[int(count/page_size)] = records
+            count += page_size
+        return pages
         
     def set_default_color(self,nodeId,color):
         cypher = f'''MATCH (m) WHERE m.nodeId = '{nodeId}' 
