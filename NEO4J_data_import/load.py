@@ -41,6 +41,7 @@ class Loader():
         AUTH = ("neo4j", "123")
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
+        self.graph.delete_all()
         self.args = args
         self.result = Result()
         self.import_dir = os.path.join(args["NEO4J_PATH"],'import\\'+args["siteID"])
@@ -68,7 +69,8 @@ class Loader():
                             virtualTreeList:split(line.virtualTreeList, ','),
                             structureList:COALESCE(line.structureList,[]),
                             lastSiteNode:split(line.lastSiteNode, ','),
-                            labelColList:split(line.labelColList,',')
+                            labelColList:split(line.labelColList,','),
+                            remark:"备注信息"
                         }})\n'''.format(label='body') +\
                        '''return n'''
         #运行cypher,body_res记录返回结点n信息
@@ -86,7 +88,8 @@ class Loader():
                                 virtualTreeList:COALESCE(line.virtualTreeList,'null'),
                                 structureList:COALESCE(line.structureList,'null'),
                                 lastSiteNodeId:COALESCE(line.lastSiteNodeId,'null'),
-                                labelColList:split(line.labelColList,',')
+                                labelColList:split(line.labelColList,','),
+                                remark:"备注信息"
                             }})\n'''.format(label='instance') +\
                           '''return n'''
         #运行cypher,instance_res记录返回结点n信息

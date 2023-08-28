@@ -70,9 +70,11 @@ class Query():
             count += page_size
         return pages
         
-    def set_default_color(self,nodeId,color):
-        cypher = f'''MATCH (m) WHERE m.nodeId = '{nodeId}' 
+    def set_default_color(self,nodeId,color,remark):
+        cypher = f'''MATCH (m) 
+                    WHERE m.nodeId IN {nodeId}
                     SET m.defaultColor = '{color}'
+                    SET m.remark = '{remark}'
                     RETURN m'''
         return self._run(cypher)
 

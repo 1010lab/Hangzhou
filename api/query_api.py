@@ -23,7 +23,8 @@ class Converter():
         node_dict["text"]  = properties["nodeName"]
         node_dict["info"]  = {"type":properties["type"],
                             "snType":properties["snType"],
-                            "defaultColor":properties['defaultColor'] if properties.get('defaultColor') else "RGBA(255, 255, 255, 1)"}
+                            "defaultColor":properties['defaultColor'] if properties.get('defaultColor') else "RGBA(255, 255, 255, 1)",
+                            "remark":properties['remark']}
         self.nodes.append(node_dict)
         self.nodes_id.append(node['nodeId'])
 
@@ -123,10 +124,11 @@ class TreeQuery(Resource):
 class SetDefaultColor(Resource):
     def post(self):
         parse = reqparse.RequestParser()
-        parse.add_argument('nodeId',required=True)
+        parse.add_argument('nodeId',required=True,type = str, action = 'append')
         parse.add_argument('color',required=True)
+        parse.add_argument('remark',type=str)
         args = parse.parse_args()
-        res = q.set_default_color(args.nodeId,args.color)
+        res = q.set_default_color(args.nodeId,args.color,args.remark)
         answer = {"code":200,"message":"","data":args.color}
         return jsonify(answer)
 
