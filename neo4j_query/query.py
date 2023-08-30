@@ -17,9 +17,16 @@ class Query():
             )               
         return list(records)
 
+    #用于寻找虚拟树根节点以及孤立节点
+    def find_root(self,siteID):
+        cypher = f'''MATCH (n:body)
+                WHERE NOT (n)-[:belong_to]->() AND n.siteID = "{siteID}"
+                RETURN n;'''
+        return self._run(cypher)
+
     #本体/实体图查询(一个站点)
     #定义一个带有分页功能的图查询
-    def graph_query(self,label,siteID,page_size=10):
+    def graph_query(self,label,siteID,page_size):
         pages = {}
         count = 0
         while True:
@@ -78,6 +85,12 @@ class Query():
                     RETURN m'''
         return self._run(cypher)
 
+    def get_instance(self,nodeId):
+        cypher = f'''MATCH (ins:instance)-[:is_instance]->(m)
+                    WHERE m.nodeId = "{nodeId}"
+                    RETURN ins'''
+        return self._run(cypher)
+
     #基于固定属性查询所有结点
     def by_attribute_query(self,attributeKey,attributeValue,label):
         cypher = f'''MATCH (n{":"+label if label else ""})
@@ -92,11 +105,12 @@ class Query():
         return sorted(nodes, key=lambda node: node[order_by])
 
     #个数统计查询
-    def count_query(self,label):
-        cypher =  '''MATCH (n:{label}) RETURN  count(n) AS count'''.format(label = label)
-        if isinstance(label,list):
-            cypher =  '''MATCH (n) RETURN  count(n) AS count'''   
-        return self.graph.run(cypher).data()[0]
+    def count_query(self,label,siteID):
+        cypher =  f'''MATCH (n:{label})
+                    WHERE n.siteID = "{siteID}"
+                    RETURN  count(n) AS count'''
+        records = self._run(cypher)
+        return records[0]['count']
 
     #body/instance一跳关系查询
     def one_hop_query(self,nodeId,label):
@@ -111,7 +125,6 @@ class Query():
                     WHERE startNode.nodeId =  '{nodeId}' 
                     RETURN startNode, endNode'''
         return self.graph.run(cypher).data()
-
 
     def shortest_path_query(self,startNodeId,endNodeId):
         cypher = '''MATCH (startNode {{nodeId: '{startNodeId}'}}), (endNode {{nodeId: '{endNodeId}'}})'''.format(startNodeId=startNodeId,endNodeId=endNodeId)+\

@@ -1,4 +1,4 @@
-from flask import jsonify
+from flask import jsonify,make_response
 from neo4j_query.query import Query
 from flask_restful import Resource,reqparse
 import time
@@ -35,7 +35,8 @@ class Converter():
         line_dict["id"] = properties["relationId"]
         line_dict["from"] = start_node.__dict__['_properties']["nodeId"]
         line_dict["to"] = end_node.__dict__['_properties']["nodeId"]
-        line_dict["info"]  = {"relationType":properties["relationType"],
+        line_dict["text"] = properties["relationName"] if properties.get("relationName") else None
+        line_dict["info"]  = {"relationType":properties["relationType"] ,
                             "treeId":properties["treeId"] if properties.get("treeId") else None,
                             "labelList":"未导入部分"}
         self.lines.append(line_dict)
@@ -46,7 +47,6 @@ class Converter():
     def clear(self):
         self.nodes = []
         self.lines = []
-
 
 class GraphQuery(Resource):
     def __init__(self) -> None:
@@ -67,7 +67,7 @@ class GraphQuery(Resource):
                 if relation is not None:
                     self.convert.add_relation(start_node,relation,end_node)
                     self.convert.add_node(end_node)
-            self.items.append({"page":page,"nodes":self.convert.nodes, "lines":self.convert.lines})
+            self.res[page+1]= {"nodes":self.convert.nodes, "lines":self.convert.lines,"totalPage":len(data.keys())}
             self.convert.clear()
 
     #本体/实体个数统计查询,若未指定类型返回总节点数
@@ -77,11 +77,17 @@ class GraphQuery(Resource):
         #添加参数label用于指定节点便签，当没有指定是默认为None
         parse.add_argument('label',choices=['body','instance'])
         parse.add_argument('siteID',required=True)
-        parse.add_argument('pageSize',type=int)
+        parse.add_argument('pageSize',type= int,default= 10,help= "请输入int类型数据")
+        parse.add_argument('pageNum',type= int,default= 1,help= "请输入int类型数据")
         args = parse.parse_args()
         res = q.graph_query(args.label,args.siteID,args.pageSize)
         self._convert_data(res)
-        answer = {"code":200,"message":"success","data":self.items}
+        if len(res.keys()) == 0:
+            return jsonify({"code":200,"message":"","data":{}})
+        if len(res.keys()) < args.pageNum or args.pageNum ==0:
+            response = make_response(r'''{"message":"请求页数出错"}''',400)
+            return response
+        answer = {"code":200,"message":"","data":self.res[args.pageNum]}
         return jsonify(answer)
 
 class TreeQuery(Resource):
@@ -99,11 +105,10 @@ class TreeQuery(Resource):
                 relation = record['r']
                 end_node = record['end']
                 self.convert.add_node(start_node)
-                
                 if relation is not None:
                     self.convert.add_relation(start_node,relation,end_node)
                     self.convert.add_node(end_node)
-            self.items.append({"page":page,"nodes":self.convert.nodes, "lines":self.convert.lines})
+            self.res[page+1]= {"nodes":self.convert.nodes, "lines":self.convert.lines,"totalPage":len(data.keys())}
             self.convert.clear()
 
 
@@ -114,11 +119,17 @@ class TreeQuery(Resource):
         parse.add_argument('label',choices=['body','instance'])
         parse.add_argument('treeId',required=True)
         parse.add_argument('siteID',required=True)
-        parse.add_argument('pageSize',type=int)
+        parse.add_argument('pageSize',type= int,help= "请输入int类型数据")
+        parse.add_argument('pageNum',type= int,default= 1,help= "请输入int类型数据")
         args = parse.parse_args()
         res = q.tree_query(args.label,args.treeId,args.siteID,args.pageSize)
         self._convert_data(res)
-        answer = {"code":200,"message":"success","data":self.items}
+        if len(res.keys()) == 0:
+            return jsonify({"code":200,"message":"","data":{}})
+        if len(res.keys()) < args.pageNum or args.pageNum ==0:
+            response = make_response('''{"message":"请求页数出错"}''',400)
+            return response
+        answer = {"code":200,"message":"","data":self.res[args.pageNum]}
         return jsonify(answer)
 
 class SetDefaultColor(Resource):
@@ -132,6 +143,29 @@ class SetDefaultColor(Resource):
         answer = {"code":200,"message":"","data":args.color}
         return jsonify(answer)
 
+class GetInstance(Resource):
+    def __init__(self) -> None:
+        self.convert = Converter()
+   
+
+    def _convert_data(self,data):
+        #查询结果进行处理，处理成前段需要的格式
+            for record in data:
+                start_node = record['ins']
+                self.convert.add_node(start_node)
+
+
+    #本体/实体个数统计查询,若未指定类型返回总节点数
+    def post(self):
+        # req_data = request.get_json(force=True)
+        parse = reqparse.RequestParser()
+        parse.add_argument('nodeId',required=True,type=str)
+        args = parse.parse_args()
+        res = q.get_instance(args.nodeId)
+        self._convert_data(res)
+        answer = {"code":200,"message":"","data":self.convert.nodes}
+        return jsonify(answer)
+
 class CountQuery(Resource):
     def __init__(self) -> None:
         pass
@@ -141,8 +175,9 @@ class CountQuery(Resource):
         # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
         parse.add_argument('label',choices=['body','instance'])
+        parse.add_argument('siteID',required=True)
         args = parse.parse_args()
-        res = q.count_query(args.label)
+        res = q.count_query(args.label,args.siteID)
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
 

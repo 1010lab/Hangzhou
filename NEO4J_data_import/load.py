@@ -41,7 +41,6 @@ class Loader():
         AUTH = ("neo4j", "123")
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
-        self.graph.delete_all()
         self.args = args
         self.result = Result()
         self.import_dir = os.path.join(args["NEO4J_PATH"],'import\\'+args["siteID"])
@@ -123,7 +122,6 @@ class Loader():
         self.result.relation_info.append(f'导入实体-实例关系:{b2i_res}')
         return self.result
         
-
     def load_relation(self) -> Result:
         body_relation_filename = os.path.join(self.args["siteID"]+'/body_relation.csv')
         #导入BODY关系的cypher语句

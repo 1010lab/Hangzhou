@@ -20,6 +20,7 @@ api.add_resource(LoadApi,'/loadNodeAndRelationToNeo4j')
 api.add_resource(GraphQuery,'/query/graphQuery')
 api.add_resource(TreeQuery,'/query/treeQuery')
 api.add_resource(CountQuery,'/query/countQuery')
+api.add_resource(GetInstance,'/query/getInstance')
 api.add_resource(OneHopQuery,'/query/oneHopQuery')
 api.add_resource(ThreeHopQuery,'/query/threeHopQuery')
 api.add_resource(ByAttributeQuery,'/query/byAttributeQuery')
@@ -28,5 +29,5 @@ api.add_resource(SetDefaultColor,'/query/setDefaultColor')
 #额外的
 
 if __name__=='__main__':
-    app.run(host="0.0.0.0",threaded=True)
+    app.run(host="0.0.0.0",threaded=True,debug=True)
     # server.serve_forever()
