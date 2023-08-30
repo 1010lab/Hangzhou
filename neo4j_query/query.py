@@ -1,5 +1,5 @@
 from py2neo import Graph
-import time
+from neo4j_query.utils import generate_id
 from neo4j import GraphDatabase
 
 class Query():
@@ -17,12 +17,30 @@ class Query():
             )               
         return list(records)
 
+    def find_root(self):
+        cypher = f'''MATCH (root:body)
+                WHERE root.nodeId = 'rootrootroot'
+                return root'''
+        return len(self._run(cypher)) != 0
+
     #用于寻找虚拟树根节点以及孤立节点
-    def find_root(self,siteID):
-        cypher = f'''MATCH (n:body)
-                WHERE NOT (n)-[:belong_to]->() AND n.siteID = "{siteID}"
-                RETURN n;'''
-        return self._run(cypher)
+    def create_root(self,siteID):
+        rootId = siteID +"root"
+        cypher = "merge (root:body{nodeId :'"+ rootId + "'})"+\
+                f'''WITH root
+                MATCH (n:body)
+                WHERE NOT (n)-[:belong_to]->() AND n.nodeId <> '{rootId}' AND n.siteID = "{siteID}"
+                CREATE (n)-[:belong_to]->(root)
+                RETURN root'''
+        self._run(cypher)
+        return siteID
+
+    def delete_root(self,siteID):
+        rootId = siteID +"root"
+        cypher = f'''MATCH (n:body) WHERE n.nodeId= "{rootId}"
+                    OPTIONAL MATCH (n)-[r]-()
+                    DELETE n,r'''
+        self._run(cypher)
 
     #本体/实体图查询(一个站点)
     #定义一个带有分页功能的图查询
@@ -113,11 +131,12 @@ class Query():
         return records[0]['count']
 
     #body/instance一跳关系查询
-    def one_hop_query(self,nodeId,label):
-        cypher =  f'''MATCH (startNode{":"+label if label else ""})-[r]->(endNode)
-                      WHERE startNode.nodeId = '{nodeId}' 
-                      RETURN startNode, r, endNode'''
-        return self.graph.run(cypher).data()
+    def one_hop_query(self,label,nodeId):
+        #label冗余对接是否保留
+        cypher =  f'''MATCH (start{":"+label if label else ""})-[r]-(end{":"+label if label else ""})
+                      WHERE start.nodeId = '{nodeId}' AND TYPE(r) in ["belong_to","is_instance"]
+                      RETURN start,r, end'''
+        return self._run(cypher)
 
     #三跳关系查询，不区分body和instance
     def three_hop_query(self,nodeId,label):

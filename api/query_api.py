@@ -20,11 +20,11 @@ class Converter():
         #如果该id存在，则不添加
         if self.find(properties['nodeId']):
             return
-        node_dict["text"]  = properties["nodeName"]
-        node_dict["info"]  = {"type":properties["type"],
-                            "snType":properties["snType"],
+        node_dict["text"]  = properties["nodeName"] if properties.get("nodeName") else None
+        node_dict["info"]  = {"type":properties["type"] if properties.get("type") else None,
+                            "snType":properties["snType"] if properties.get("snType") else None,
                             "defaultColor":properties['defaultColor'] if properties.get('defaultColor') else "RGBA(255, 255, 255, 1)",
-                            "remark":properties['remark']}
+                            "remark":properties['remark'] if properties.get("remark") else None}
         self.nodes.append(node_dict)
         self.nodes_id.append(node['nodeId'])
 
@@ -32,13 +32,13 @@ class Converter():
     def add_relation(self,start_node,relation,end_node):
         line_dict = {}
         properties = relation.__dict__['_properties']
-        line_dict["id"] = properties["relationId"]
+        line_dict["id"] = properties["relationId"] if properties.get("relationId") else None
         line_dict["from"] = start_node.__dict__['_properties']["nodeId"]
         line_dict["to"] = end_node.__dict__['_properties']["nodeId"]
         line_dict["text"] = properties["relationName"] if properties.get("relationName") else None
-        line_dict["info"]  = {"relationType":properties["relationType"] ,
+        line_dict["info"]  = {"relationType":properties["relationType"] if properties.get("relationType") else None,
                             "treeId":properties["treeId"] if properties.get("treeId") else None,
-                            "labelList":"未导入部分"}
+                            "labelList": "未导入部分"}
         self.lines.append(line_dict)
 
     def find(self,id):
@@ -69,7 +69,13 @@ class GraphQuery(Resource):
                     self.convert.add_node(end_node)
             self.res[page+1]= {"nodes":self.convert.nodes, "lines":self.convert.lines,"totalPage":len(data.keys())}
             self.convert.clear()
-
+    
+    #生成虚拟root
+    def generate_root(self,siteID):
+        root = q.create_root(siteID)
+        return root
+        
+            
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
         # req_data = request.get_json(force=True)
@@ -80,6 +86,7 @@ class GraphQuery(Resource):
         parse.add_argument('pageSize',type= int,default= 10,help= "请输入int类型数据")
         parse.add_argument('pageNum',type= int,default= 1,help= "请输入int类型数据")
         args = parse.parse_args()
+        rootId = self.generate_root(args.siteID)
         res = q.graph_query(args.label,args.siteID,args.pageSize)
         self._convert_data(res)
         if len(res.keys()) == 0:
@@ -87,6 +94,7 @@ class GraphQuery(Resource):
         if len(res.keys()) < args.pageNum or args.pageNum ==0:
             response = make_response(r'''{"message":"请求页数出错"}''',400)
             return response
+        self.res[args.pageNum]['rootId'] = rootId
         answer = {"code":200,"message":"","data":self.res[args.pageNum]}
         return jsonify(answer)
 
@@ -183,15 +191,34 @@ class CountQuery(Resource):
 
 class OneHopQuery(Resource):
     def __init__(self) -> None:
-        pass
+        self.convert = Converter()
+        self.items = []
+        self.res = {}
+   
 
+    def _convert_data(self,data):
+        #查询结果进行处理，处理成前段需要的格式
+        for record in data:
+            start_node = record['start']
+            relation = record['r']
+            end_node = record['end']
+            if relation is not None:
+                self.convert.add_relation(start_node,relation,end_node)
+                self.convert.add_node(end_node)
+        self.res = {"nodes":self.convert.nodes, "lines":self.convert.lines}
+        self.convert.clear()
+
+
+    #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
+        # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
-        parse.add_argument('nodeId',type=str,required=True,help="查询节点不能为空")
-        parse.add_argument('label',type=str,default=None)
+        parse.add_argument('label',choices=['body','instance'])
+        parse.add_argument('nodeId',required=True)
         args = parse.parse_args()
-        res = q.one_hop_query(args.nodeId,args.label)
-        answer = {"code":200,"message":"","data":res}
+        res = q.one_hop_query(args.label,args.nodeId)
+        self._convert_data(res)
+        answer = {"code":200,"message":"","data":self.res}
         return jsonify(answer)
 
 class ThreeHopQuery(Resource):
