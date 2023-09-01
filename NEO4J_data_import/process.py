@@ -58,9 +58,8 @@ class Processor():
         node_name = node_df['nodeName']
         label = node_df['attribute']
         type = node_df['type']
-        lastSiteNode = node_df['lastSiteNodeId'].fillna('[]').\
-                                        apply(ast.literal_eval).\
-                                        apply(lambda x: ",".join(x) if x!=[] else 'null')
+        fileType = node_df['fileType']
+        lastSiteNode = node_df['lastSiteNodeId'].map(lambda x : x.replace('@','/') if pd.notnull(x) else x)
         labelColObject = node_df['labelCollections'].fillna('[]').\
                                                             apply(ast.literal_eval)
         labelColList = labelColObject.apply(lambda x: [item['id'] for item in x])
@@ -79,10 +78,10 @@ class Processor():
         #生成新的CSV文件
         arrays = np.array([id,node_name,label,sn_type,
                           type,lastSiteNode,labelColList,virtualTreeList,
-                          structureList]).T
+                          structureList,fileType]).T
         node_df = pd.DataFrame(arrays,columns=['id','node_name','label','sn_type',
                                 'type','lastSiteNode','labelColList','virtualTreeList',
-                                'structureList'])
+                                'structureList','fileType'])
         self.write_by_label(node_df)
         return tree_list,label_tree_list
 
@@ -166,7 +165,7 @@ class Processor():
 
 def find_end(row):
     if row['relationType'] == '10':
-        if row['assStaticSNList'] is not None:
+        if row['assStaticSNList'] is not None and pd.notnull(row['assStaticSNList']):
             sn_list = ast.literal_eval(row['assStaticSNList'])
             sn_list.append(row['assSimpleSN'])
             return sn_list

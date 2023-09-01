@@ -6,27 +6,46 @@ import time
 q = Query()
 
 class Converter():
+    '''
+        处理neo4j返回的转换类
+            :param self.nodes: 存放需求格式的节点信息
+            :param self.lines: 存放需求格式的边信息
+            :param self.node_id: 存放已经添加的节点ID信息
+            :param self.count_root: 用于统计在一页中出现的root节点的个数，在图查询中为虚拟root节点，在树查询中为所在虚拟树的根节点
+    '''
     def __init__(self) -> None:
         self.nodes = []
         self.lines = []
         #维护一个列表来查看哪些node已经添加到self.nodes里了
         self.nodes_id = []
+        self.count_root = 0
         
     #添加node信息
-    def add_node(self,node):
+    def add_node(self,node,rootId=None):
         node_dict ={}
         properties = node.__dict__['_properties']
         node_dict["id"] = properties['nodeId']
         #如果该id存在，则不添加
-        if self.find(properties['nodeId']):
+        if self.find(properties['nodeId']) and properties['nodeId'] != rootId:
+            return
+        if properties['nodeId'] == rootId and self.count_root != 0:
             return
         node_dict["text"]  = properties["nodeName"] if properties.get("nodeName") else None
         node_dict["info"]  = {"type":properties["type"] if properties.get("type") else None,
                             "snType":properties["snType"] if properties.get("snType") else None,
                             "defaultColor":properties['defaultColor'] if properties.get('defaultColor') else "RGBA(255, 255, 255, 1)",
-                            "remark":properties['remark'] if properties.get("remark") else None}
+                            "remark":properties['remark'] if properties.get("remark") else None,
+                            "fileType":properties['fileType'] if properties.get("fileType") != "null" and properties.get("fileType") else None}
         self.nodes.append(node_dict)
-        self.nodes_id.append(node['nodeId'])
+        #如果不是root节点或不存在root节点加入到nodeList中则加入节点信息
+        if properties['nodeId'] != rootId or self.count_root == 0:
+            self.nodes_id.append(node['nodeId'])
+        #统计root节点的个数
+        if properties['nodeId'] == rootId:
+            self.count_root += 1
+
+       
+        
 
     #添加line信息
     def add_relation(self,start_node,relation,end_node):
@@ -40,13 +59,25 @@ class Converter():
                             "treeId":properties["treeId"] if properties.get("treeId") else None,
                             "labelList": "未导入部分"}
         self.lines.append(line_dict)
-
+    
+    #在self.nodeId中查找当前id是否存在
     def find(self,id):
         return True if id in self.nodes_id else False
     
+    #去除重复的边
+    def unique_line(self):
+        unique_dict ={}
+        for item in self.lines:
+            key = (item["from"],item["to"])
+            unique_dict[key] = item
+        
+        self.lines = list(unique_dict.values())
+
+    #用于重置页面，清空nodes和lines以及count_root
     def clear(self):
         self.nodes = []
         self.lines = []
+        self.count_root =0
 
 class GraphQuery(Resource):
     def __init__(self) -> None:
@@ -54,27 +85,34 @@ class GraphQuery(Resource):
         self.items = []
         self.res = {}
    
-
-    def _convert_data(self,data):
-        #查询结果进行处理，处理成前段需要的格式
+    def _convert_data(self,data,siteID,rootId):
+        #查询对应的页面以及查询结果
         for page,records in data.items():
             for record in records:
                 start_node = record['start']
                 relation = record['r']
                 end_node = record['end']
-                self.convert.add_node(start_node)
+                self.convert.add_node(start_node,rootId)
                 
                 if relation is not None:
                     self.convert.add_relation(start_node,relation,end_node)
-                    self.convert.add_node(end_node)
+                    self.convert.add_node(end_node,rootId)
+            #查找出的root下的所有边关系
+            root_relations = q.find_root_relation(rootId)
+            for root_relation in root_relations:
+                node = root_relation['s']
+                relation = root_relation['r']
+                root = root_relation['rt']
+                self.convert.add_relation(node,relation,root)
+            #寻找虚拟root节点
+            root = q.find_vroot(siteID)
+            if root is not None:
+                #为每个页面添加虚拟root节点
+                self.convert.add_node(root[0]['root'],rootId)
+            #边去重
+            self.convert.unique_line()
             self.res[page+1]= {"nodes":self.convert.nodes, "lines":self.convert.lines,"totalPage":len(data.keys())}
             self.convert.clear()
-    
-    #生成虚拟root
-    def generate_root(self,siteID):
-        root = q.create_root(siteID)
-        return root
-        
             
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
@@ -86,9 +124,9 @@ class GraphQuery(Resource):
         parse.add_argument('pageSize',type= int,default= 10,help= "请输入int类型数据")
         parse.add_argument('pageNum',type= int,default= 1,help= "请输入int类型数据")
         args = parse.parse_args()
-        rootId = self.generate_root(args.siteID)
+        rootId = q.create_root(args.siteID)
         res = q.graph_query(args.label,args.siteID,args.pageSize)
-        self._convert_data(res)
+        self._convert_data(res,args.siteID,rootId)
         if len(res.keys()) == 0:
             return jsonify({"code":200,"message":"","data":{}})
         if len(res.keys()) < args.pageNum or args.pageNum ==0:
@@ -98,6 +136,7 @@ class GraphQuery(Resource):
         answer = {"code":200,"message":"","data":self.res[args.pageNum]}
         return jsonify(answer)
 
+#虚拟树查询
 class TreeQuery(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
@@ -105,17 +144,20 @@ class TreeQuery(Resource):
         self.res = {}
    
 
-    def _convert_data(self,data):
+    def _convert_data(self,data,treeId,rootId):
         #查询结果进行处理，处理成前段需要的格式
         for page,records in data.items():
             for record in records:
                 start_node = record['start']
                 relation = record['r']
                 end_node = record['end']
-                self.convert.add_node(start_node)
+                self.convert.add_node(start_node,rootId)
                 if relation is not None:
                     self.convert.add_relation(start_node,relation,end_node)
-                    self.convert.add_node(end_node)
+                    self.convert.add_node(end_node,rootId)
+            root = q.find_root(treeId)
+            if root is not None:
+                self.convert.add_node(root[0]['root'],rootId)
             self.res[page+1]= {"nodes":self.convert.nodes, "lines":self.convert.lines,"totalPage":len(data.keys())}
             self.convert.clear()
 
@@ -131,12 +173,19 @@ class TreeQuery(Resource):
         parse.add_argument('pageNum',type= int,default= 1,help= "请输入int类型数据")
         args = parse.parse_args()
         res = q.tree_query(args.label,args.treeId,args.siteID,args.pageSize)
-        self._convert_data(res)
+        #查找虚拟树的根节点
+        root = q.find_root(args.treeId)
+        rootId = root[0]['root'].__dict__['_properties']['nodeId']
+        self._convert_data(res,args.treeId,rootId)
+
+        #未查询到内容返回
         if len(res.keys()) == 0:
             return jsonify({"code":200,"message":"","data":{}})
+        #页数错误返回
         if len(res.keys()) < args.pageNum or args.pageNum ==0:
             response = make_response('''{"message":"请求页数出错"}''',400)
             return response
+        self.res[args.pageNum]['rootId'] = rootId
         answer = {"code":200,"message":"","data":self.res[args.pageNum]}
         return jsonify(answer)
 
@@ -202,6 +251,7 @@ class OneHopQuery(Resource):
             start_node = record['start']
             relation = record['r']
             end_node = record['end']
+            self.convert.add_node(start_node)
             if relation is not None:
                 self.convert.add_relation(start_node,relation,end_node)
                 self.convert.add_node(end_node)
@@ -213,10 +263,9 @@ class OneHopQuery(Resource):
     def post(self):
         # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
-        parse.add_argument('label',choices=['body','instance'])
         parse.add_argument('nodeId',required=True)
         args = parse.parse_args()
-        res = q.one_hop_query(args.label,args.nodeId)
+        res = q.one_hop_query(args.nodeId)
         self._convert_data(res)
         answer = {"code":200,"message":"","data":self.res}
         return jsonify(answer)

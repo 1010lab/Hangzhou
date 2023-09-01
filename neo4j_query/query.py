@@ -17,13 +17,26 @@ class Query():
             )               
         return list(records)
 
-    def find_root(self):
+    #查找虚拟根节点
+    def find_vroot(self,siteID):
+        rootId = siteID + "root"
         cypher = f'''MATCH (root:body)
-                WHERE root.nodeId = 'rootrootroot'
+                WHERE root.nodeId = '{rootId}'
                 return root'''
-        return len(self._run(cypher)) != 0
+        records = self._run(cypher)
+        return records if len(self._run(cypher)) != 0 else None
+
+    #查找虚拟树中的根节点
+    def find_root(self,treeId):
+        cypher = f'''MATCH (root)-[:is_root]->(vir:virtualTree)
+                WHERE vir.nodeId = '{treeId}'
+                return root'''
+        return self._run(cypher)
 
     #用于寻找虚拟树根节点以及孤立节点
+    #!存在的问题：当多站点进行图查询时，虚拟的root节点会被认为是孤立节点
+    #出现问题的原因，即当一个站点进行图查询时，会创建虚拟root节点，而当另一个站点的数据导入时，因为load语句会为所有的节点以及关系创建对应的siteID属性，
+    #如果再进行图查询，之前的虚拟root节点会被认为时孤立节点，并于当前的虚拟root节点产生关系
     def create_root(self,siteID):
         rootId = siteID +"root"
         cypher = "merge (root:body{nodeId :'"+ rootId + "'})"+\
@@ -33,7 +46,7 @@ class Query():
                 CREATE (n)-[:belong_to]->(root)
                 RETURN root'''
         self._run(cypher)
-        return siteID
+        return rootId
 
     def delete_root(self,siteID):
         rootId = siteID +"root"
@@ -42,6 +55,14 @@ class Query():
                     DELETE n,r'''
         self._run(cypher)
 
+    #用于查找虚拟树下的所以关系
+    def find_root_relation(self,rootId):
+        cypher = f'''MATCH (s)-[r:belong_to]->(rt:body)
+                WHERE rt.nodeId = '{rootId}'
+                RETURN s,r,rt'''
+        return self._run(cypher)
+
+    ###############################################################################################################
     #本体/实体图查询(一个站点)
     #定义一个带有分页功能的图查询
     def graph_query(self,label,siteID,page_size):
@@ -102,7 +123,8 @@ class Query():
                     SET m.remark = '{remark}'
                     RETURN m'''
         return self._run(cypher)
-
+        
+    #查找本体下的实例
     def get_instance(self,nodeId):
         cypher = f'''MATCH (ins:instance)-[:is_instance]->(m)
                     WHERE m.nodeId = "{nodeId}"
@@ -131,10 +153,11 @@ class Query():
         return records[0]['count']
 
     #body/instance一跳关系查询
-    def one_hop_query(self,label,nodeId):
+    def one_hop_query(self,nodeId):
         #label冗余对接是否保留
-        cypher =  f'''MATCH (start{":"+label if label else ""})-[r]-(end{":"+label if label else ""})
+        cypher =  f'''MATCH (start)-[r]-(end)
                       WHERE start.nodeId = '{nodeId}' AND TYPE(r) in ["belong_to","is_instance"]
+                      AND EXISTS(end.nodeName)
                       RETURN start,r, end'''
         return self._run(cypher)
 
