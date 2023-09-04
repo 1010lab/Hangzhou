@@ -37,21 +37,27 @@ class Query():
     #!存在的问题：当多站点进行图查询时，虚拟的root节点会被认为是孤立节点
     #出现问题的原因，即当一个站点进行图查询时，会创建虚拟root节点，而当另一个站点的数据导入时，因为load语句会为所有的节点以及关系创建对应的siteID属性，
     #如果再进行图查询，之前的虚拟root节点会被认为时孤立节点，并于当前的虚拟root节点产生关系
-    def create_root(self,siteID):
-        rootId = siteID +"root"
-        cypher = "merge (root:body{nodeId :'"+ rootId + "'})"+\
-                f'''WITH root
+    def create_root(self,siteID,page_size,page_num):
+        count = page_size*(page_num-1)
+        rootId = str(page_num) +"root"
+        cypher = f'''MATCH (start:body)
+                WHERE start.siteID = '{siteID}'
+                OPTIONAL MATCH (start:body)-[r:belong_to]->(end)
+                WHERE start.siteID = '{siteID}'
+                WITH start,r,end
+                SKIP {count}
+                LIMIT {page_size}
+                WITH COLLECT(DISTINCT start) AS allStarts, COLLECT(DISTINCT end) AS allEnds
                 MATCH (n:body)
-                WHERE NOT (n)-[:belong_to]->() AND n.nodeId <> '{rootId}' AND n.siteID = "{siteID}"
-                CREATE (n)-[:belong_to]->(root)
-                RETURN root'''
-        self._run(cypher)
-        return rootId
+                WHERE NOT (n)-[:belong_to]->() AND (n in allStarts OR n in allEnds)''' +\
+                '''merge (root:body{{nodeId :'{nodeId}'}})'''.format(nodeId=rootId) +\
+                '''with  root,n
+                CREATE (n)-[r:vir_root]->(root)
+                RETURN n,r,root'''
+        return self._run(cypher)
 
-    def delete_root(self,siteID):
-        rootId = siteID +"root"
-        cypher = f'''MATCH (n:body) WHERE n.nodeId= "{rootId}"
-                    OPTIONAL MATCH (n)-[r]-()
+    def delete_root(self,rootId):
+        cypher = f'''MATCH (n:body)-[r]-() WHERE n.nodeId= "{rootId}"
                     DELETE n,r'''
         self._run(cypher)
 
@@ -65,33 +71,17 @@ class Query():
     ###############################################################################################################
     #本体/实体图查询(一个站点)
     #定义一个带有分页功能的图查询
-    def graph_query(self,label,siteID,page_size):
-        pages = {}
-        count = 0
-        while True:
-            if label:
-                cypher = f'''MATCH (start:{label})
-                            WHERE start.siteID = '{siteID}'
-                            OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
-                            WHERE start.siteID = '{siteID}'
-                            RETURN start, r, end 
-                            SKIP {count}
-                            LIMIT {page_size}
-                            '''
-            #若label为None,则查询所有节点
-            else:
-                cypher = f'''MATCH (start)
-                            WHERE (start:body OR start:instance) AND start.siteID = '{siteID}'
-                            OPTIONAL MATCH (start)-[r:belong_to]->(end)
-                            WHERE start.siteID = '{siteID}'
-                            RETURN start, r, end 
-                            SKIP {count}
-                            LIMIT {page_size}'''
-            records = self._run(cypher)
-            if(len(records) == 0): break   
-            pages[int(count/page_size)] = records
-            count += page_size
-        return pages
+    def graph_query(self,label,siteID,page_size,page_num):
+        count = page_size*(page_num-1)
+        cypher = f'''MATCH (start:{label})
+                    WHERE start.siteID = '{siteID}'
+                    OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
+                    WHERE start.siteID = '{siteID}'
+                    RETURN start, r, end 
+                    SKIP {count}
+                    LIMIT {page_size}'''
+        records = self._run(cypher)
+        return records
 
     def tree_query(self,label,treeId,siteID,page_size):
         pages = {}

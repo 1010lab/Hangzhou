@@ -1,7 +1,7 @@
 from flask import jsonify,make_response
 from neo4j_query.query import Query
 from flask_restful import Resource,reqparse
-import time
+import math
 
 q = Query()
 
@@ -21,14 +21,11 @@ class Converter():
         self.count_root = 0
         
     #添加node信息
-    def add_node(self,node,rootId=None):
+    def add_node(self,node):
         node_dict ={}
         properties = node.__dict__['_properties']
         node_dict["id"] = properties['nodeId']
-        #如果该id存在，则不添加
-        if self.find(properties['nodeId']) and properties['nodeId'] != rootId:
-            return
-        if properties['nodeId'] == rootId and self.count_root != 0:
+        if self.find(properties['nodeId']):
             return
         node_dict["text"]  = properties["nodeName"] if properties.get("nodeName") else None
         node_dict["info"]  = {"type":properties["type"] if properties.get("type") else None,
@@ -37,16 +34,8 @@ class Converter():
                             "remark":properties['remark'] if properties.get("remark") else None,
                             "fileType":properties['fileType'] if properties.get("fileType") != "null" and properties.get("fileType") else None}
         self.nodes.append(node_dict)
-        #如果不是root节点或不存在root节点加入到nodeList中则加入节点信息
-        if properties['nodeId'] != rootId or self.count_root == 0:
-            self.nodes_id.append(node['nodeId'])
-        #统计root节点的个数
-        if properties['nodeId'] == rootId:
-            self.count_root += 1
-
-       
-        
-
+        self.nodes_id.append(node['nodeId'])
+      
     #添加line信息
     def add_relation(self,start_node,relation,end_node):
         line_dict = {}
@@ -77,42 +66,37 @@ class Converter():
     def clear(self):
         self.nodes = []
         self.lines = []
-        self.count_root =0
+        self.nodes_id = []
+        # self.count_root =0
+
 
 class GraphQuery(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
-        self.items = []
+        
         self.res = {}
    
-    def _convert_data(self,data,siteID,rootId):
+    def _convert_data(self,data,page,root_records):
         #查询对应的页面以及查询结果
-        for page,records in data.items():
-            for record in records:
-                start_node = record['start']
-                relation = record['r']
-                end_node = record['end']
-                self.convert.add_node(start_node,rootId)
-                
-                if relation is not None:
-                    self.convert.add_relation(start_node,relation,end_node)
-                    self.convert.add_node(end_node,rootId)
-            #查找出的root下的所有边关系
-            root_relations = q.find_root_relation(rootId)
-            for root_relation in root_relations:
-                node = root_relation['s']
-                relation = root_relation['r']
-                root = root_relation['rt']
-                self.convert.add_relation(node,relation,root)
-            #寻找虚拟root节点
-            root = q.find_vroot(siteID)
-            if root is not None:
-                #为每个页面添加虚拟root节点
-                self.convert.add_node(root[0]['root'],rootId)
-            #边去重
-            self.convert.unique_line()
-            self.res[page+1]= {"nodes":self.convert.nodes, "lines":self.convert.lines,"totalPage":len(data.keys())}
-            self.convert.clear()
+        items = []
+        for record in data:
+            start_node = record['start']
+            relation = record['r']
+            end_node = record['end']
+            self.convert.add_node(start_node)
+            if relation is not None:
+                self.convert.add_relation(start_node,relation,end_node)
+                self.convert.add_node(end_node)
+        for record in root_records:
+            start_node = record['n']
+            relation = record['r']
+            end_node = record['root']
+            self.convert.add_node(start_node)
+            if relation is not None:
+                self.convert.add_relation(start_node,relation,end_node)
+                self.convert.add_node(end_node)
+        items = {"nodes":self.convert.nodes, "lines":self.convert.lines,"totalPage":page}
+        return items
             
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
@@ -124,16 +108,16 @@ class GraphQuery(Resource):
         parse.add_argument('pageSize',type= int,default= 10,help= "请输入int类型数据")
         parse.add_argument('pageNum',type= int,default= 1,help= "请输入int类型数据")
         args = parse.parse_args()
-        rootId = q.create_root(args.siteID)
-        res = q.graph_query(args.label,args.siteID,args.pageSize)
-        self._convert_data(res,args.siteID,rootId)
-        if len(res.keys()) == 0:
-            return jsonify({"code":200,"message":"","data":{}})
-        if len(res.keys()) < args.pageNum or args.pageNum ==0:
+        res = q.graph_query(args.label,args.siteID,args.pageSize,args.pageNum)
+        root_records = q.create_root(args.siteID,args.pageSize,args.pageNum)
+        page = math.ceil(q.count_query(args.label,args.siteID) / args.pageSize)
+        items = self._convert_data(res,page,root_records)
+        if page < args.pageNum or args.pageNum ==0:
             response = make_response(r'''{"message":"请求页数出错"}''',400)
             return response
-        self.res[args.pageNum]['rootId'] = rootId
-        answer = {"code":200,"message":"","data":self.res[args.pageNum]}
+        items['rootId'] = str(args.pageNum) +"root"
+        answer = {"code":200,"message":"","data":items}
+        q.delete_root(str(args.pageNum) +"root")
         return jsonify(answer)
 
 #虚拟树查询
