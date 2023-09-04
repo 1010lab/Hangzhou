@@ -2,7 +2,6 @@ from py2neo import Graph
 import os
 import shutil
 import logging
-from tree import create_relation
 from neo4j import GraphDatabase
 
 #自定义logger对象，用于记录load的操作日志 
@@ -203,14 +202,14 @@ class Loader():
             rel_num += len(root_node)
             for body_node in root_node:
                 body_node = body_node['n']
-                create_relation(body_node,'is_root',tree_node,self.graph)
+                tree.create_relation(body_node,'is_root',tree_node,self.graph)
 
         #建立标签与节点间的关系
         if(type == 'labelCollection'):
             for id in tree.nodeIdLists:
                 cypher = f'''MATCH (n) WHERE n.nodeId = "{id}" RETURN n'''
                 node = self.graph.run(cypher).data()[0]['n']
-                create_relation(tree_node,'is_label',node,self.graph)
+                tree.create_relation(tree_node,'is_label',node,self.graph)
         return self.result
 
 

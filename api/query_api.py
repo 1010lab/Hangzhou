@@ -69,7 +69,6 @@ class Converter():
         self.nodes_id = []
         # self.count_root =0
 
-
 class GraphQuery(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
@@ -109,7 +108,7 @@ class GraphQuery(Resource):
         parse.add_argument('pageNum',type= int,default= 1,help= "请输入int类型数据")
         args = parse.parse_args()
         res = q.graph_query(args.label,args.siteID,args.pageSize,args.pageNum)
-        root_records = q.create_root(args.siteID,args.pageSize,args.pageNum)
+        root_records = q.create_root(args.label,args.siteID,args.pageSize,args.pageNum)
         page = math.ceil(q.count_query(args.label,args.siteID) / args.pageSize)
         items = self._convert_data(res,page,root_records)
         if page < args.pageNum or args.pageNum ==0:
@@ -268,6 +267,7 @@ class ThreeHopQuery(Resource):
         return jsonify(answer)      
 
 class ByAttributeQuery(Resource):
+
     def __init__(self) -> None:
         pass
 
@@ -279,4 +279,13 @@ class ByAttributeQuery(Resource):
         args = parse.parse_args()
         res = q.by_attribute_query(args.attributeKey,args.attributeValue,args.label)
         answer = {"code":200,"message":"","data":res}
+        return jsonify(answer)      
+
+class DeleteGraph(Resource):
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('siteID',required=True)
+        args = parse.parse_args()
+        summary = q.delete_graph(args.siteID)
+        answer = {"code":200,"message":"","data":summary.counters.__dict__}
         return jsonify(answer)      

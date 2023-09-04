@@ -75,11 +75,12 @@ class Query():
         count = page_size*(page_num-1)
         cypher = f'''MATCH (start:{label})
                     WHERE start.siteID = '{siteID}'
+                    WITH start
+                    SKIP {count}
+                    LIMIT {page_size}
                     OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
                     WHERE start.siteID = '{siteID}'
-                    RETURN start, r, end 
-                    SKIP {count}
-                    LIMIT {page_size}'''
+                    RETURN start, r, end '''
         records = self._run(cypher)
         return records
 
@@ -164,3 +165,14 @@ class Query():
                 '''RETURN shortestPath'''
         return self.graph.run(cypher).data()[0]
 
+    def delete_graph(self,siteID):
+        cypher =f'''MATCH (n)
+                WHERE n.siteID = "{siteID}"
+                OPTIONAL MATCH (n)-[r]-()
+                WHERE r.siteID = "{siteID}"
+                DELETE n, r'''
+        records,summary,keys = self.driver.execute_query(
+                cypher,
+                database_="neo4j",
+            )
+        return summary        

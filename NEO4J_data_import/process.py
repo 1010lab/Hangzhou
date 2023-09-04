@@ -58,7 +58,9 @@ class Processor():
         node_name = node_df['nodeName']
         label = node_df['attribute']
         type = node_df['type']
-        fileType = node_df['fileType']
+        #新添
+        node_df['fileType'] = node_df['type']
+        fileType = node_df['fileType'] 
         lastSiteNode = node_df['lastSiteNodeId'].map(lambda x : x.replace('@','/') if pd.notnull(x) else x)
         labelColObject = node_df['labelCollections'].fillna('[]').\
                                                             apply(ast.literal_eval)
@@ -182,6 +184,7 @@ def get_tree(virtualTreeObject,nodeId,nodeName,func_name):
     tree_id_list = []
     for row,id,name in zip(virtualTreeObject,nodeId,nodeName):
         for item in row:
+            #保证创建的虚拟树是唯一的，但其中的值不能更新
             if  item['id'] not in tree_id_list:
                 if func_name == 'create_tree':
                     tree,treeId = create_tree(item,id,name)

@@ -25,6 +25,7 @@ api.add_resource(OneHopQuery,'/query/oneHopQuery')
 api.add_resource(ThreeHopQuery,'/query/threeHopQuery')
 api.add_resource(ByAttributeQuery,'/query/byAttributeQuery')
 api.add_resource(SetDefaultColor,'/query/setDefaultColor')
+api.add_resource(DeleteGraph,'/deleteGraph')
 
 #额外的
 
