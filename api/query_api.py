@@ -253,6 +253,39 @@ class OneHopQuery(Resource):
         answer = {"code":200,"message":"","data":self.res}
         return jsonify(answer)
 
+class TypeQuery(Resource):
+    def __init__(self) -> None:
+        self.convert = Converter()
+        self.items = []
+        self.res = {}
+   
+
+    def _convert_data(self,data):
+        #查询结果进行处理，处理成前段需要的格式
+        for record in data:
+            start_node = record['start']
+            relation = record['r']
+            end_node = record['end']
+            self.convert.add_node(start_node)
+            if relation is not None:
+                self.convert.add_relation(start_node,relation,end_node)
+                self.convert.add_node(end_node)
+        self.res = {"nodes":self.convert.nodes, "lines":self.convert.lines}
+        self.convert.clear()
+
+
+    #本体/实体个数统计查询,若未指定类型返回总节点数
+    def post(self):
+        # req_data = request.get_json(force=True)
+        parse = reqparse.RequestParser()
+        parse.add_argument('nodeId',required=True)
+        parse.add_argument('type',required=True,choices=[0,1],type=int)
+        args = parse.parse_args()
+        res = q.type_query(args.nodeId,args.type)
+        self._convert_data(res)
+        answer = {"code":200,"message":"","data":self.res}
+        return jsonify(answer)
+
 class ThreeHopQuery(Resource):
     def __init__(self) -> None:
         pass

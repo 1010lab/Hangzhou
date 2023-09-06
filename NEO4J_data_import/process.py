@@ -6,7 +6,6 @@ import glob
 import uuid
 import time
 import ast
-from tree import create_tree,create_label_col
 
 '''
     处理CSV文件，形成用于导入NEO4J的数据格式以及字段要求。
@@ -57,6 +56,7 @@ class Processor():
         id = node_df['id'].map(lambda x : x.replace('@','/'))
         node_name = node_df['nodeName']
         label = node_df['attribute']
+        #——————新增数据原站点数据没有该字段
         type = node_df['type']
         #新添
         node_df['fileType'] = node_df['type']
@@ -66,16 +66,19 @@ class Processor():
                                                             apply(ast.literal_eval)
         labelColList = labelColObject.apply(lambda x: [item['id'] for item in x])
         labelColList = labelColList.apply(lambda x: ",".join(x) if x!=[] else 'null')                                                    
-        label_tree_list = get_tree(labelColObject,id,node_name,"create_label_col")
+        
         # virtualTreeList = node_df['virtualTreeList']
         virtualTreeObeject = node_df['virtualTreeList'].fillna('[]').\
                                                 apply(ast.literal_eval)
         virtualTreeList = virtualTreeObeject.apply(lambda x: [item['id'] for item in x])
         virtualTreeList = virtualTreeList.apply(lambda x: ",".join(x) if x!=[] else 'null')
         
-        tree_list = get_tree(virtualTreeObeject,id,node_name,'create_tree')
+        
 
-        structureList = node_df['structureList']
+        structureObeject = node_df['structureList'].fillna('[]').\
+                                                apply(ast.literal_eval)
+        structureList = structureObeject.apply(lambda x: ",".join(x) if x!=[] else 'null')
+                                               
         sn_type = node_df['snType']
         #生成新的CSV文件
         arrays = np.array([id,node_name,label,sn_type,
@@ -85,7 +88,7 @@ class Processor():
                                 'type','lastSiteNode','labelColList','virtualTreeList',
                                 'structureList','fileType'])
         self.write_by_label(node_df)
-        return tree_list,label_tree_list
+        return labelColObject,virtualTreeObeject,id
 
     def get_instance_relation(self):
         instance_relation_df = pd.read_csv(self.relation_path + '//Instance.csv')
@@ -94,6 +97,8 @@ class Processor():
         pid = instance_relation_df['pid']
         virtualTreeList = instance_relation_df['virtualTreeList']
         bodyRelationId = instance_relation_df['bodyRelationId']
+        # groupId = instance_relation_df['groupId']
+        groupId = instance_relation_df['siteNodeId']
         #根据timestamp生成INSTANCE的ID
         relationId = instance_relation_df.apply(lambda row:
                                 generate_id()
@@ -102,10 +107,12 @@ class Processor():
                                 )
         #生成新的CSV文件
         arrays = np.array([start_id,pid,relationId,
-                           virtualTreeList,bodyRelationId
+                           virtualTreeList,bodyRelationId,
+                           groupId
                            ]).T
         instance_relation_df = pd.DataFrame(arrays, columns=['startId','pid','relationId',
-                                                             'virtualTreeList','bodyRelationId'
+                                                             'virtualTreeList','bodyRelationId',
+                                                             'groupId'
                                                          ])
         #ID处理成结点后24位ID
         instance_relation_df['startId'] = instance_relation_df['startId'].map(lambda x: x.replace('@','/') if pd.notnull(x) else x)
@@ -177,28 +184,6 @@ def find_end(row):
         return sn_list
     if row['relationType'] == '00':
          return [row['assSimpleSN']] 
-
-#从虚拟树json数据中解析出所有的虚拟树TreeNode对象
-def get_tree(virtualTreeObject,nodeId,nodeName,func_name): 
-    tree_list=[]
-    tree_id_list = []
-    for row,id,name in zip(virtualTreeObject,nodeId,nodeName):
-        for item in row:
-            #保证创建的虚拟树是唯一的，但其中的值不能更新
-            if  item['id'] not in tree_id_list:
-                if func_name == 'create_tree':
-                    tree,treeId = create_tree(item,id,name)
-                else:
-                    tree,treeId = create_label_col(item,id,name)
-                tree_list.append(tree)
-                tree_id_list.append(treeId)
-            #若存在此树，则添加节点id和节点name
-            else:
-                #用于指向需要添加的TreeNode
-                index = tree_id_list.index(item['id'])
-                tree_list[index].add_nodeIdLists(id)
-                tree_list[index].add_nodeNameLists(name)
-    return tree_list
 
 def generate_id():
     unique_uuid = uuid.uuid4() 

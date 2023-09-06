@@ -2,7 +2,9 @@ from py2neo import Graph
 import os
 import shutil
 import logging
+import time
 from neo4j import GraphDatabase
+from tree import create_tree_node,create_label_col_node
 
 #自定义logger对象，用于记录load的操作日志 
 logger = logging.getLogger(__name__)
@@ -65,7 +67,7 @@ class Loader():
                             nodeId:line.id,nodeName:line.node_name,
                             snType:line.sn_type,type:COALESCE(line.type,[]) ,
                             virtualTreeList:split(line.virtualTreeList, ','),
-                            structureList:COALESCE(line.structureList,[]),
+                            structureList:split(line.structureList,','),
                             lastSiteNode:COALESCE(line.lastSiteNode, 'null'),
                             labelColList:split(line.labelColList,','),
                             remark:"备注信息",
@@ -155,7 +157,8 @@ class Loader():
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
             '''MERGE (from)-[r:{relation}{{
                 relationId:line.relationId,
-                bodyRelationId:COALESCE(line.bodyRelationId,'null')
+                bodyRelationId:COALESCE(line.bodyRelationId,'null'),
+                groupId:COALESCE(line.groupId,'null')
                 }}]-> (to)\n'''.format(relation="belong_to") +\
             '''RETURN r'''
         #运行cypher,instance_relation_res记录返回关系r信息
@@ -169,6 +172,7 @@ class Loader():
         #记录导入关系信息
         self.result.relation_num += instance_relation_res
         self.result.relation_info.append(f'导入实例关系:{instance_relation_res}')
+        #根据bodyrelationId来找出实例关系间的relationType
         rel_type_cypher = '''MATCH (:instance)-[r1]->(:instance)
                         WITH r1,r1.bodyRelationId AS id
                         MATCH (:body)-[r2]-(:body)
@@ -188,29 +192,54 @@ class Loader():
                     SET n.siteID = "{self.args["siteID"]}"'''
         self.graph.run(cypher2)
 
-    def tree_relation(self,tree,type):
-        rel_num = 0
-        treeId = tree.treeId
-        tree_node = tree.create_node(self.graph)
-        if(type == 'virtualTree'):
-        #查找到某虚拟树的根节点
-            cypher = f'''
-                        MATCH (n:body)
-                        WHERE  NOT (n)-[:belong_to]->() AND "{treeId}" IN n.virtualTreeList
-                        RETURN n'''
-            root_node = self.graph.run(cypher).data()
-            rel_num += len(root_node)
-            for body_node in root_node:
-                body_node = body_node['n']
-                tree.create_relation(body_node,'is_root',tree_node,self.graph)
+    def get_tree(self,virtualTreeObject,nodeId,func_name): 
+        tree_list=[]
+        tree_id_list = []
+        for row,id in zip(virtualTreeObject,nodeId):
+            for item in row:
+                #保证创建的虚拟树是唯一的，但其中的值不能更新
+                #创建Node类，不同于Node结点
+                childrens = item.get('children') or None
+                if  item['id'] not in tree_id_list:
+                    if func_name == 'create_tree':
+                        tree_node,treeId = create_tree_node(item)
+                    else:
+                        tree_node,treeId = create_label_col_node(item)
+                    #创建Node结点
+                    node = tree_node.create_node(self.graph)
+                    #创建树与根结点，或创建标签组
+                    if func_name == 'create_tree': self.tree_relation(tree_node,node)
+                    if func_name == 'create_label_col': self.label_relation(tree_node,node,id,childrens)
+                    tree_list.append(node)
+                    tree_id_list.append(treeId)
+                #若存在此树，则添加节点id和节点name
+                else:
+                    #用于指向需要添加的TreeNode
+                    index = tree_id_list.index(item['id'])
+                    node = tree_list[index]
+                    if func_name == 'create_label_col': self.label_relation(tree_node,node,id,childrens)
 
+        logger.info('导入成功:'+time.ctime())
+
+    def tree_relation(self,tree_node,node):
+        treeId = tree_node.treeId
+        #查找到某虚拟树的根节点
+        cypher = f'''
+                    MATCH (n:body)
+                    WHERE  NOT (n)-[:belong_to]->() AND "{treeId}" IN n.virtualTreeList
+                    RETURN n'''
+        root_node = self.graph.run(cypher).data()
+        for body_node in root_node:
+            body_node = body_node['n']
+            tree_node.create_relation(body_node,'is_root',node,self.graph)
+
+    def label_relation(self,tree_node,node,id,childrens):
         #建立标签与节点间的关系
-        if(type == 'labelCollection'):
-            for id in tree.nodeIdLists:
-                cypher = f'''MATCH (n) WHERE n.nodeId = "{id}" RETURN n'''
-                node = self.graph.run(cypher).data()[0]['n']
-                tree.create_relation(tree_node,'is_label',node,self.graph)
-        return self.result
+            #查找与对应标准结点的关系
+        cypher = f'''MATCH (n) WHERE n.nodeId = "{id}" RETURN n'''
+        basic_node = self.graph.run(cypher).data()[0]['n']
+        label_list = [{"key":children.get("name"),"value":children.get("value")} for children in childrens]
+        tree_node.create_relation(node,'is_label',basic_node,label_list,self.graph)
 
 
 

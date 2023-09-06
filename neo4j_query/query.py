@@ -152,6 +152,17 @@ class Query():
                       RETURN start,r, end'''
         return self._run(cypher)
 
+    def  type_query(self,nodeId,type):
+        if type == 1:
+            cypher =  f'''MATCH (start)-[r]-(end)
+                        WHERE start.nodeId = '{nodeId}' AND  start.snType = '2' AND end.snType = '2'
+                        RETURN start,r, end'''
+        else:
+            cypher =  f'''MATCH (start)-[r]-(end)
+                        WHERE start.nodeId = '{nodeId}' AND end.snType <> '2' AND TYPE(r) in ["belong_to","is_instance"]
+                        RETURN start,r, end'''
+        return self._run(cypher)
+
     #三跳关系查询，不区分body和instance
     def three_hop_query(self,nodeId,label):
         cypher =  f'''MATCH (startNode{":"+label if label else ""})-[*1..3]->(endNode)
