@@ -31,10 +31,6 @@ def main(args) -> Result:
         r = loader.load_node()
     loader.get_tree(labelColObject,id,'create_label_col')
     loader.get_tree(virtualTreeObeject,id,'create_tree')
-    # for tree in label_tree:
-    #     r = loader.tree_relation(tree,"labelCollection")
-    # for tree in tree_list:
-    #     r = loader.tree_relation(tree,"virtualTree")
     loader.set_siteId()
     return r.to_string()
         

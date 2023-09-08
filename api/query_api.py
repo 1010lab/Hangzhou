@@ -43,6 +43,7 @@ class Converter():
         line_dict["id"] = properties["relationId"] if properties.get("relationId") else None
         line_dict["from"] = start_node.__dict__['_properties']["nodeId"]
         line_dict["to"] = end_node.__dict__['_properties']["nodeId"]
+        line_dict["groupId"] = properties["groupId"] if properties.get("groupId") else None
         line_dict["text"] = properties["relationName"] if properties.get("relationName") else None
         line_dict["info"]  = {"relationType":properties["relationType"] if properties.get("relationType") else None,
                             "treeId":properties["treeId"] if properties.get("treeId") else None,
@@ -57,7 +58,7 @@ class Converter():
     def unique_line(self):
         unique_dict ={}
         for item in self.lines:
-            key = (item["from"],item["to"])
+            key = (item["from"],item["to"],item["groupId"])
             unique_dict[key] = item
         
         self.lines = list(unique_dict.values())
@@ -70,6 +71,39 @@ class Converter():
         # self.count_root =0
 
 class GraphQuery(Resource):
+    def __init__(self) -> None:
+        self.convert = Converter()
+        self.items = []
+        self.res = {}
+   
+
+    def _convert_data(self,data):
+        #查询结果进行处理，处理成前段需要的格式
+        for record in data:
+            start_node = record['start']
+            relation = record['r']
+            end_node = record['end']
+            self.convert.add_node(start_node)
+            if relation is not None:
+                self.convert.add_relation(start_node,relation,end_node)
+                self.convert.add_node(end_node)
+        self.res = {"nodes":self.convert.nodes, "lines":self.convert.lines}
+        self.convert.clear()
+
+
+    #本体/实体个数统计查询,若未指定类型返回总节点数
+    def post(self):
+        # req_data = request.get_json(force=True)
+        parse = reqparse.RequestParser()
+        parse.add_argument('label',choices=['body','instance'])
+        parse.add_argument('siteID',required=True)
+        args = parse.parse_args()
+        res = q.graph_query(args.label,args.siteID)
+        self._convert_data(res)
+        answer = {"code":200,"message":"","data":self.res}
+        return jsonify(answer)
+
+class GraphQueryWithPage(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
         
@@ -107,8 +141,8 @@ class GraphQuery(Resource):
         parse.add_argument('pageSize',type= int,default= 10,help= "请输入int类型数据")
         parse.add_argument('pageNum',type= int,default= 1,help= "请输入int类型数据")
         args = parse.parse_args()
-        res = q.graph_query(args.label,args.siteID,args.pageSize,args.pageNum)
-        root_records = q.create_root(args.label,args.siteID,args.pageSize,args.pageNum)
+        res = q.graph_query_with_page(args.label,args.siteID,args.pageSize,args.pageNum)
+        root_records = q.create_root(args.siteID,args.pageSize,args.pageNum)
         page = math.ceil(q.count_query(args.label,args.siteID) / args.pageSize)
         items = self._convert_data(res,page,root_records)
         if page < args.pageNum or args.pageNum ==0:
@@ -322,3 +356,39 @@ class DeleteGraph(Resource):
         summary = q.delete_graph(args.siteID)
         answer = {"code":200,"message":"","data":summary.counters.__dict__}
         return jsonify(answer)      
+
+#表结构：表内查询
+class InStructureQuery(Resource):
+    def __init__(self) -> None:
+        self.convert = Converter()
+        self.items = []
+        self.res = {}
+   
+
+    def _convert_data(self,data):
+        #查询结果进行处理，处理成前段需要的格式
+        for record in data:
+            start_node = record['start']
+            relation = record['r']
+            end_node = record['end']
+            self.convert.add_node(start_node)
+            if relation is not None:
+                self.convert.add_relation(start_node,relation,end_node)
+                self.convert.add_node(end_node)
+        
+    #本体/实体个数统计查询,若未指定类型返回总节点数
+    def post(self):
+        # req_data = request.get_json(force=True)
+        parse = reqparse.RequestParser()
+        parse.add_argument('structureId',required=True)
+        args = parse.parse_args()
+        res = q.structure_query(args.structureId)
+        self._convert_data(res)
+        res = q.sc_ins_realtion_query(args.structureId)
+        self._convert_data(res)
+        res = q.sc_instance_query(args.structureId)
+        self._convert_data(res)
+        self.convert.unique_line()
+        self.res = {"nodes":self.convert.nodes, "lines":self.convert.lines}
+        answer = {"code":200,"message":"","data":self.res}
+        return jsonify(answer)

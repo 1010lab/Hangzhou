@@ -18,6 +18,7 @@ api = Api(app)
 
 api.add_resource(LoadApi,'/loadNodeAndRelationToNeo4j')
 api.add_resource(GraphQuery,'/query/graphQuery')
+api.add_resource(GraphQueryWithPage,'/query/graphQueryWithPage')
 api.add_resource(TreeQuery,'/query/treeQuery')
 api.add_resource(CountQuery,'/query/countQuery')
 api.add_resource(GetInstance,'/query/getInstance')
@@ -27,6 +28,7 @@ api.add_resource(ThreeHopQuery,'/query/threeHopQuery')
 api.add_resource(ByAttributeQuery,'/query/byAttributeQuery')
 api.add_resource(SetDefaultColor,'/query/setDefaultColor')
 api.add_resource(DeleteGraph,'/deleteGraph')
+api.add_resource(InStructureQuery,'/query/inStructureQuery')
 
 #额外的
 

@@ -91,6 +91,7 @@ class Processor():
         return labelColObject,virtualTreeObeject,id
 
     def get_instance_relation(self):
+        if(not os.path.exists(self.relation_path + '//Instance.csv')):return
         instance_relation_df = pd.read_csv(self.relation_path + '//Instance.csv')
         #获取NEO4J导入字段
         start_id = instance_relation_df['siteNodeId']
@@ -125,6 +126,7 @@ class Processor():
         )
   
     def get_body_relation(self):
+        if(not os.path.exists(self.relation_path + '//Body.csv')):return
         body_relation_df = pd.read_csv(self.relation_path+'//Body.csv')
         #获取NEO4J导入字段
         body_relation_df['relationType'] = body_relation_df['relationType'].astype(str).replace({'0': '00'})
@@ -172,18 +174,20 @@ class Processor():
                         encoding='utf-8',
                         )   
 
+#查看属于哪种关系
 def find_end(row):
-    if row['relationType'] == '10':
+    if row['relationType'] == '11':
         if row['assStaticSNList'] is not None and pd.notnull(row['assStaticSNList']):
             sn_list = ast.literal_eval(row['assStaticSNList'])
             sn_list.append(row['assSimpleSN'])
             return sn_list
         else: return []
-    if row['relationType'] == '11' :
-        sn_list = ast.literal_eval(row['assStaticSNList']) if pd.notnull(row['assStaticSNList']) else []
-        return sn_list
-    if row['relationType'] == '00':
-         return [row['assSimpleSN']] 
+    # if row['relationType'] == '11' :
+    #     sn_list = ast.literal_eval(row['assStaticSNList']) if pd.notnull(row['assStaticSNList']) else []
+    #     return sn_list
+    if row['relationType'] == '00' or row['relationType'] == '10':
+        print(row['assSimpleSN'])
+        return [row['assSimpleSN']] 
 
 def generate_id():
     unique_uuid = uuid.uuid4() 

@@ -69,9 +69,30 @@ class Query():
         return self._run(cypher)
 
     ###############################################################################################################
+    def graph_query(self,label,siteID):
+        if label =='body':
+            cypher = f'''MATCH (start:{label})
+                    WHERE start.siteID = '{siteID}'
+                    OPTIONAL MATCH (start:{label})-[r:belong_to]->(end)
+                    WHERE start.siteID = '{siteID}'
+                    RETURN start, r, end '''
+        if label =='instance':
+            cypher = f'''MATCH (start:{label})
+                    WHERE start.siteID = '{siteID}'
+                    OPTIONAL MATCH (start:{label})-[r:belong_to]->(end:{label})
+                    WHERE start.siteID = '{siteID}'
+                    RETURN start, r, end ''' 
+        if label is None:
+            cypher =f'''MATCH (start)
+                    WHERE start.siteID = '{siteID}' AND LABELS(start) in [['body'],['instance']]
+                    OPTIONAL MATCH (start)-[r]->(end)
+                    WHERE start.siteID = '{siteID}' AND TYPE(r) in ['belong_to','is_instance']
+                    RETURN start, r, end '''
+        return self._run(cypher)
+
     #本体/实体图查询(一个站点)
     #定义一个带有分页功能的图查询
-    def graph_query(self,label,siteID,page_size,page_num):
+    def graph_query_with_page(self,label,siteID,page_size,page_num):
         count = page_size*(page_num-1)
         cypher = f'''MATCH (start:{label})
                     WHERE start.siteID = '{siteID}'
@@ -187,3 +208,36 @@ class Query():
                 database_="neo4j",
             )
         return summary        
+
+    '''
+        表结构组查询
+        structure_query:查询表结构关系
+        sc_instance_query:查询表结构本体对应实体
+        sc_ins_realtion_query:查询表结构对应实体以及关系
+    '''
+    #根据表结构id查询表结构中的节点以及关系
+    def structure_query(self,structureId):
+        cypher =f'''MATCH p = (start)-[r]->(end)
+                    WHERE '{structureId}' IN  start.structureList AND '{structureId}' IN  end.structureList
+                    RETURN  start,r,end'''
+        return self._run(cypher)
+    
+    #查找表结构下本体对应实体要素以及本体与实体间的关系
+    def sc_instance_query(self,structureId):
+        cypher =f'''MATCH p = (start1)-[r1]->(end1)
+                    WHERE '{structureId}' IN  start1.structureList AND '{structureId}' IN  end1.structureList
+                    WITH COLLECT(start1) + COLLECT(end1) AS combinedNodes
+                    MATCH (start)-[r:is_instance]->(end)
+                    WHERE end IN combinedNodes
+                    RETURN start,r,end'''
+        return self._run(cypher)
+
+    #查找表结构本体下的实体以及实体之间的关系
+    def sc_ins_realtion_query(self,structureId):
+        cypher =f'''MATCH p = (start1)-[r1]->(end1)
+                    WHERE '{structureId}' IN  start1.structureList AND '{structureId}' IN  end1.structureList
+                    WITH r1.relationId AS rid
+                    MATCH (start)-[r:belong_to]->(end) 
+                    WHERE r.bodyRelationId = rid
+                    RETURN start,r,end'''
+        return self._run(cypher)

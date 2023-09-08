@@ -61,6 +61,7 @@ class Loader():
         self.__move__()    
         #导入节点
         logger.info('******导入程序已启动*******')
+        logger.info('******导入站点:'+self.args.siteID+'*******')
         #导入BODY的cypher语句
         body_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args.siteID+'\\BODY.csv') +\
                       '''MERGE (n:{label} {{
@@ -128,50 +129,52 @@ class Loader():
     def load_relation(self) -> Result:
         body_relation_filename = os.path.join(self.args["siteID"]+'/body_relation.csv')
         #导入BODY关系的cypher语句
-        body_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=body_relation_filename) +\
-            '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
-            '''MERGE (from)-[r:{relation}{{
-                relationType:line.relationType,
-                relationId:line.relationId,
-                relationName:line.relationName,
-                labelList:COALESCE(line.labelList,'null'),
-                treeId:split(line.treeId, ','),
-                treeName:COALESCE(line.treeName,'null')
-            }}]-> (to)\n'''.format(relation="belong_to") +\
-            '''RETURN r'''
-        #运行cypher,body_relation_res记录返回关系r信息
-        records,summary,keys = self.driver.execute_query(
-                body_relation_cypher,
-                database_="neo4j",
-            )
-        body_relation_res = len(records)
-        logger.info('导入实体关系成功')
-        logger.debug(f'导入实体关系:{body_relation_res},导入时间:{summary.result_available_after}ms')
-        #记录导入关系信息
-        self.result.relation_num += body_relation_res
-        self.result.relation_info.append(f'导入实体关系:{body_relation_res}')
-
-        instance_relation_filename = os.path.join(self.args["siteID"]+'/instance_relation.csv')
-        #导入INSTANCE关系的cypher语句
-        instance_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
-            '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
-            '''MERGE (from)-[r:{relation}{{
-                relationId:line.relationId,
-                bodyRelationId:COALESCE(line.bodyRelationId,'null'),
-                groupId:COALESCE(line.groupId,'null')
+        if(os.path.exists(self.import_dir+'/body_relation.csv')):
+            body_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=body_relation_filename) +\
+                '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
+                '''MERGE (from)-[r:{relation}{{
+                    relationType:line.relationType,
+                    relationId:line.relationId,
+                    relationName:line.relationName,
+                    labelList:COALESCE(line.labelList,'null'),
+                    treeId:split(line.treeId, ','),
+                    treeName:COALESCE(line.treeName,'null')
                 }}]-> (to)\n'''.format(relation="belong_to") +\
-            '''RETURN r'''
-        #运行cypher,instance_relation_res记录返回关系r信息
-        records,summary,keys = self.driver.execute_query(
-                instance_relation_cypher,
-                database_="neo4j",
-            )
-        instance_relation_res = len(records)
-        logger.info('导入实例关系成功')
-        logger.debug(f'导入实例关系:{instance_relation_res},导入时间:{summary.result_available_after}ms')
-        #记录导入关系信息
-        self.result.relation_num += instance_relation_res
-        self.result.relation_info.append(f'导入实例关系:{instance_relation_res}')
+                '''RETURN r'''
+            #运行cypher,body_relation_res记录返回关系r信息
+            records,summary,keys = self.driver.execute_query(
+                    body_relation_cypher,
+                    database_="neo4j",
+                )
+            body_relation_res = len(records)
+            logger.info('导入实体关系成功')
+            logger.debug(f'导入实体关系:{body_relation_res},导入时间:{summary.result_available_after}ms')
+            #记录导入关系信息
+            self.result.relation_num += body_relation_res
+            self.result.relation_info.append(f'导入实体关系:{body_relation_res}')
+
+        if(os.path.exists(self.import_dir+'/instance_relation.csv')):
+            instance_relation_filename = os.path.join(self.args["siteID"]+'/instance_relation.csv')
+            #导入INSTANCE关系的cypher语句
+            instance_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
+                '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
+                '''MERGE (from)-[r:{relation}{{
+                    relationId:line.relationId,
+                    bodyRelationId:COALESCE(line.bodyRelationId,'null'),
+                    groupId:COALESCE(line.groupId,'null')
+                    }}]-> (to)\n'''.format(relation="belong_to") +\
+                '''RETURN r'''
+            #运行cypher,instance_relation_res记录返回关系r信息
+            records,summary,keys = self.driver.execute_query(
+                    instance_relation_cypher,
+                    database_="neo4j",
+                )
+            instance_relation_res = len(records)
+            logger.info('导入实例关系成功')
+            logger.debug(f'导入实例关系:{instance_relation_res},导入时间:{summary.result_available_after}ms')
+            #记录导入关系信息
+            self.result.relation_num += instance_relation_res
+            self.result.relation_info.append(f'导入实例关系:{instance_relation_res}')
         #根据bodyrelationId来找出实例关系间的relationType
         rel_type_cypher = '''MATCH (:instance)-[r1]->(:instance)
                         WITH r1,r1.bodyRelationId AS id
@@ -224,13 +227,14 @@ class Loader():
     def tree_relation(self,tree_node,node):
         treeId = tree_node.treeId
         #查找到某虚拟树的根节点
-        cypher = f'''
-                    MATCH (n:body)
-                    WHERE  NOT (n)-[:belong_to]->() AND "{treeId}" IN n.virtualTreeList
-                    RETURN n'''
+        cypher = f'''MATCH p=(n:body)-[:belong_to*]->(root)
+                WHERE "{treeId}" IN n.virtualTreeList
+                AND "{treeId}" IN root.virtualTreeList
+                RETURN root
+                LIMIT 1'''
         root_node = self.graph.run(cypher).data()
         for body_node in root_node:
-            body_node = body_node['n']
+            body_node = body_node['root']
             tree_node.create_relation(body_node,'is_root',node,self.graph)
 
     def label_relation(self,tree_node,node,id,childrens):
