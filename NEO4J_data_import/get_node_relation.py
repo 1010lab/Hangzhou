@@ -51,7 +51,7 @@ class GetNodeRelation():
         headers = {
             "Request-Origion" : "SwaggerBootstrapUi",
             "accept" : "*/*",
-            "Authorization" : "eyJhbGciOiJIUzUxMiIsInppcCI6IkRFRiJ9.eNocjE0LwjAQRP_Lnlsw2WyS9ih4EBQv3sRD02ylfrShqaKI_92lMKeZN-8L-RmgBmtadBg6jKvoW8ONwUiaFRTQNzPUylbKkrWOpMhZHpE5lfN446HMPL14EvQ697J0hBiUjuRjMI5a79j7wB3aSkJRQH6nxakr0osz8fQQ6-lcwH289MPxk1hU-8N6u9vA7w8AAP__.2XqU1n5t52Z_yCTu3ntj5gxUj7JJaZxYORz24XamSoMnF7p4ht1_yKPadEvCrkaELvzCEewRPFk1EvJuCUCKxw",
+            "Authorization" : "eyJhbGciOiJIUzUxMiIsInppcCI6IkRFRiJ9.eNocjMsKwjAQRf9l1i2kyeTRLgUXguLGnbhImlHqow1NFEX8d4dyd_eee76QnwE6MNgrq8JZRRFdj-RRRS2pgQoGX6BrTIsoGuMsFznzIxKlukw3GutM84tmRq9l4MVpi5ojjPMohfTGkexDkAKp9d4wSO-0OLVp7eJMND_YejxVcJ8uw3j4JGLVbr_abNfw-wMAAP__.VnnJbCzrLBtBdhrVr64RxD0P2fK9LCa8QkKn97SuFbfEcYM0NHW6NsdjeaLctrUDrG27VIH5pvK6m67lGlxnEg",
             "Content-Type" : "application/json"
         }
         # 发送 POST 请求

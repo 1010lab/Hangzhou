@@ -29,6 +29,7 @@ api.add_resource(ByAttributeQuery,'/query/byAttributeQuery')
 api.add_resource(SetDefaultColor,'/query/setDefaultColor')
 api.add_resource(DeleteGraph,'/deleteGraph')
 api.add_resource(InStructureQuery,'/query/inStructureQuery')
+api.add_resource(OutStructureQuery,'/query/outStructureQuery')
 
 #额外的
 

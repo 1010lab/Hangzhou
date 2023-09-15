@@ -137,6 +137,7 @@ class Loader():
                     relationId:line.relationId,
                     relationName:line.relationName,
                     labelList:COALESCE(line.labelList,'null'),
+                    structureList:split(line.structureList,','),
                     treeId:split(line.treeId, ','),
                     treeName:COALESCE(line.treeName,'null')
                 }}]-> (to)\n'''.format(relation="belong_to") +\
@@ -227,14 +228,16 @@ class Loader():
     def tree_relation(self,tree_node,node):
         treeId = tree_node.treeId
         #查找到某虚拟树的根节点
-        cypher = f'''MATCH p=(n:body)-[:belong_to*]->(root)
-                WHERE "{treeId}" IN n.virtualTreeList
-                AND "{treeId}" IN root.virtualTreeList
-                RETURN root
-                LIMIT 1'''
+        cypher = f'''MATCH (n:body)
+            WHERE "{treeId}" IN n.virtualTreeList
+            OPTIONAL MATCH (n)-[r]->(m)
+            WHERE "{treeId}" IN m.virtualTreeList AND "{treeId}" IN r.treeId
+            WITH n, r, m
+            WHERE n IS NOT NULL AND r IS NULL AND m IS NULL
+            RETURN n'''
         root_node = self.graph.run(cypher).data()
         for body_node in root_node:
-            body_node = body_node['root']
+            body_node = body_node['n']
             tree_node.create_relation(body_node,'is_root',node,self.graph)
 
     def label_relation(self,tree_node,node,id,childrens):

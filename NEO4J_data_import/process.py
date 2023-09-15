@@ -141,7 +141,10 @@ class Processor():
         # end_id = body_relation_df['assSimpleSN']
         relationId = body_relation_df['id']
         relationName = body_relation_df['name']
-        structureList = body_relation_df['structureList']
+        structureObeject = body_relation_df['structureList'].fillna('[]').\
+                                                apply(ast.literal_eval)
+        structureList = structureObeject.apply(lambda x: ",".join(x) if x!=[] else 'null')
+                                               
         treeId = body_relation_df['treeId'].fillna('[]').\
                                         apply(ast.literal_eval).\
                                         apply(lambda x: ",".join(x) if x!=[] else 'null')
@@ -186,7 +189,6 @@ def find_end(row):
     #     sn_list = ast.literal_eval(row['assStaticSNList']) if pd.notnull(row['assStaticSNList']) else []
     #     return sn_list
     if row['relationType'] == '00' or row['relationType'] == '10':
-        print(row['assSimpleSN'])
         return [row['assSimpleSN']] 
 
 def generate_id():
