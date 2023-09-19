@@ -6,3 +6,4 @@ requirements.txt
 /neo4j_query/__pycache__
 /NEO4J_data_import/__pycache__
 .vscode
+.env

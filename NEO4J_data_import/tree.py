@@ -42,15 +42,52 @@ class LabelColletionNode:
             relation[key] = value
         graph.create(relation)
 
-    #创建LabelCollection标签
+    #先创建对应的label的Node节点，再创建标签组与标签之间的关系
     def create_node(self,graph):
-        # label_node_list = self.create_label_node(graph)
+        label_node_list = self.create_label_node(graph)
         node = Node('labelCollection',nodeName = self.treeName,  
         nodeId=self.treeId, labelIds = self.labelIds,type = self.type, 
         classificationIds = self.classificationIds,
         organizationId = self.organizationId)
         graph.create(node)
+        for label_node in label_node_list:
+            relation = Relationship(label_node,'belong_to',node)
+            graph.create(relation)
         return node
+    
+    #创建标签node对象，并获得所有的对象列表
+    def create_label_node(self,graph):
+        label_list = [LabelNode(children.get("name"), children.get("id"), children.get("dataType"),
+                    children.get("type"), children.get("classificationIds"),
+                    children.get("organizationId"),children.get("labelIdPath"),
+                    children.get("dataIndex")) for children in self.childrenLists]
+        label_node_list = []
+        for label_node in label_list:
+            node = label_node.create_node(graph)
+            label_node_list.append(node)
+        return label_node_list
+
+
+class LabelNode():
+    def __init__(self,nodeName,nodeId,dataType,type,classificationIds,
+                organizationId,labelIdPath,dataIndex) -> None:
+        self.nodeName = nodeName
+        self.nodeId = nodeId 
+        self.dataType = dataType
+        self.type = type
+        self.classificationIds = classificationIds
+        self.organizaztionId = organizationId
+        self.labelIdPath = labelIdPath
+        self.dataIndex = dataIndex
+
+    def create_node(self,graph):
+        node = Node('label',nodeName = self.nodeName,  
+        nodeId=self.nodeId, dataType=self.dataType, type = self.type,
+        classificationIds = self.classificationIds,organizationId = self.organizaztionId,
+        labelIdPath = self.labelIdPath,dataIndex = self.dataIndex)
+        graph.create(node)
+        return node
+
 
 #通过json数据来创建对应的TreeNode对象
 def create_tree_node(item): 
@@ -72,10 +109,3 @@ def create_label_col_node(item):
                     labelIds,type,classificationIds,
                     organizationId,childrenLists)
     return tree,treeId
-
-
-    
-
-   
-        
-

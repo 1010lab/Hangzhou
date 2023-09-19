@@ -72,8 +72,9 @@ class Loader():
                             lastSiteNode:COALESCE(line.lastSiteNode, 'null'),
                             labelColList:split(line.labelColList,','),
                             remark:"备注信息",
-                            fileType:COALESCE(line.fileType,'null')
-                        }})\n'''.format(label='body') +\
+                            fileType:COALESCE(line.fileType,'null'),
+                            siteID:"{siteID}"
+                        }})\n'''.format(label='body',siteID = self.args["siteID"]) +\
                        '''return n'''
         #运行cypher,body_res记录返回结点n信息
         records,summary,keys = self.driver.execute_query(
@@ -92,8 +93,9 @@ class Loader():
                                 lastSiteNodeId:COALESCE(line.lastSiteNodeId,'null'),
                                 labelColList:split(line.labelColList,','),
                                 remark:"备注信息",
-                                fileType:COALESCE(line.fileType,'null')
-                            }})\n'''.format(label='instance') +\
+                                fileType:COALESCE(line.fileType,'null'),
+                                siteID:"{siteID}"
+                            }})\n'''.format(label='instance',siteID = self.args["siteID"]) +\
                           '''return n'''
         #运行cypher,instance_res记录返回结点n信息
         records,summary,keys = self.driver.execute_query(
@@ -111,7 +113,8 @@ class Loader():
         relation2_filename = os.path.join(self.args["siteID"]+'/relation_b2i.csv')
         relation2_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=relation2_filename) +\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
-            '''MERGE (from)-[r:{relation}]-> (to)\n'''.format(relation="is_instance") +\
+            '''MERGE (from)-[r:{relation}]-> (to)\n'''.format(relation="is_instance",siteID = self.args["siteID"]) +\
+            '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"])+\
             '''RETURN r'''
         #运行cypher,b2i_res记录返回关系r信息
         records,summary,keys = self.driver.execute_query(
@@ -140,7 +143,8 @@ class Loader():
                     structureList:split(line.structureList,','),
                     treeId:split(line.treeId, ','),
                     treeName:COALESCE(line.treeName,'null')
-                }}]-> (to)\n'''.format(relation="belong_to") +\
+                }}]-> (to)\n'''.format(relation="belong_to",siteID = self.args["siteID"]) +\
+                '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"])+\
                 '''RETURN r'''
             #运行cypher,body_relation_res记录返回关系r信息
             records,summary,keys = self.driver.execute_query(
@@ -164,7 +168,7 @@ class Loader():
                     bodyRelationId:COALESCE(line.bodyRelationId,'null'),
                     groupId:COALESCE(line.groupId,'null')
                     }}]-> (to)\n'''.format(relation="belong_to") +\
-                '''RETURN r'''
+                '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"]) +'''RETURN r'''
             #运行cypher,instance_relation_res记录返回关系r信息
             records,summary,keys = self.driver.execute_query(
                     instance_relation_cypher,
@@ -186,15 +190,6 @@ class Loader():
         self.driver.execute_query(rel_type_cypher,database_="neo4j")
         return self.result
     
-    def set_siteId(self):
-        cypher1 = f'''MATCH ()-[r]->()
-                    WHERE NOT EXISTS(r.siteID)  
-                    SET r.siteID = "{self.args["siteID"]}"'''
-        self.graph.run(cypher1)
-        cypher2 = f'''MATCH (n)
-                    WHERE NOT EXISTS(n.siteID) AND EXISTS(n.nodeName) 
-                    SET n.siteID = "{self.args["siteID"]}"'''
-        self.graph.run(cypher2)
 
     def get_tree(self,virtualTreeObject,nodeId,func_name): 
         tree_list=[]
@@ -210,10 +205,10 @@ class Loader():
                     else:
                         tree_node,treeId = create_label_col_node(item)
                     #创建Node结点
+                    #创建标签并创建标签与标签组的关系
                     node = tree_node.create_node(self.graph)
-                    #创建树与根结点，或创建标签组
-                    if func_name == 'create_tree': self.tree_relation(tree_node,node)
-                    if func_name == 'create_label_col': self.label_relation(tree_node,node,id,childrens)
+                    #创建树与根结点，或创建标签组并创建标签
+                    self.tree_relation(tree_node,node) if func_name == 'create_tree' else self.label_relation(tree_node,node,id,childrens)
                     tree_list.append(node)
                     tree_id_list.append(treeId)
                 #若存在此树，则添加节点id和节点name
@@ -222,8 +217,7 @@ class Loader():
                     index = tree_id_list.index(item['id'])
                     node = tree_list[index]
                     if func_name == 'create_label_col': self.label_relation(tree_node,node,id,childrens)
-
-        logger.info('导入成功:'+time.ctime())
+        logger.info('导入虚拟树节点成功:'+time.ctime()) if func_name == 'create_tree' else logger.info('导入标签组节点成功:'+time.ctime())
 
     def tree_relation(self,tree_node,node):
         treeId = tree_node.treeId

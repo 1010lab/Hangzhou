@@ -227,10 +227,13 @@ class Query():
         return self.graph.run(cypher).data()
 
     def shortest_path_query(self,startNodeId,endNodeId):
-        cypher = '''MATCH (startNode {{nodeId: '{startNodeId}'}}), (endNode {{nodeId: '{endNodeId}'}})'''.format(startNodeId=startNodeId,endNodeId=endNodeId)+\
-                '''MATCH shortestPath = shortestPath((startNode)-[*]-(endNode)) '''+\
-                '''RETURN shortestPath'''
-        return self.graph.run(cypher).data()[0]
+        cypher = f'''MATCH path = shortestPath((startNode)-[r*]-(endNode)) 
+                WHERE startNode.nodeId= '{startNodeId}' AND endNode.nodeId = '{endNodeId}'
+                WITH NODES(path) AS allNodes, RELATIONSHIPS(path) AS allRelationships
+                MATCH (start)-[r]->(end) 
+                WHERE  start IN allNodes AND end IN allNodes AND r IN allRelationships
+                RETURN  start,r,end'''
+        return self._run(cypher)
 
     def delete_graph(self,siteID):
         cypher =f'''MATCH (n)
@@ -363,7 +366,7 @@ class Query():
     def  outer_instance_query(self,virRoot,strRoot):
         cypher = f'''MATCH path = shortestPath((startNode)-[r*]->(endNode))
                 WHERE startNode.nodeId = "{strRoot}" AND  endNode.nodeId = "{virRoot}" 
-                WITH nodes(path) AS allNodes, relationships(path) AS allRelationships
+                WITH NODES(path) AS allNodes, RELATIONSHIPS(path) AS allRelationships
                 MATCH (start)-[r]-(end) 
                 WHERE  start IN allNodes AND TYPE(r) IN ["is_instance"] 
                 RETURN  start,r,end'''
@@ -371,21 +374,37 @@ class Query():
 
     #@3:查找路径上实体之间的关系
     def outer_ins_relation_query(self,virRoot,strRoot):
-        result = []
         tmp_cypher = f'''MATCH path = shortestPath((startNode)-[r*]->(endNode))
                 WHERE startNode.nodeId = "{strRoot}" AND  endNode.nodeId = "{virRoot}" 
-                RETURN relationships(path) AS allRelationships'''
+                WITH RELATIONSHIPS(path) AS allRelationships
+                UNWIND allRelationships AS rel
+                MATCH (start)-[r]->(end)
+                WHERE r.bodyRelationId = rel.relationId
+                RETURN start,r,end'''
         records = self._run(tmp_cypher)
-        for record in records:
-            relationId = record["allRelationships"][0].__dict__["_properties"]["relationId"]
-            cypher = f'''MATCH (start)-[r]->(end) 
-                    WHERE r.bodyRelationId = "{relationId}" 
-                    return start,r,end'''
-            ins_records = self._run(cypher)
-            result.append(ins_records)
-        return result
+        return records
         
+    '''
+        最小子图查询：
+        @para node_list:节点ID列表
+    '''
+    def minimal_graph_query(self,node_list):
+        cypher = f'''MATCH (start)
+            WHERE start.nodeId IN {node_list}
+            MATCH (allowlist)
+            WHERE allowlist.nodeId IN node_list
+            WITH start, collect(allowlist) AS allowlistNodes
+            CALL apoc.path.subgraphAll(start, {{
+                relationshipFilter: "belong_to|is_instance",
+                labelFilter: "+body|instance",
+                minLevel: 1,
+                whitelistNodes: allowlistNodes
+            }})
+            YIELD nodes, relationships
+            return nodes,relationships
+            '''
 
 if __name__ == "__main__":
     q = Query()
-    q.circle_relation('64feb10ba6e9c0753019d166')
+    res = q.outer_ins_relation_query("64e309dff53c3715653685cb/64e30a69f53c3715653685eb","64e309dff53c3715653685cb/64e30a69f53c3715653685f0")
+    print(res)
