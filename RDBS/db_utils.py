@@ -59,7 +59,4 @@ class Mysql():
             print("Data deleted successfully.")
         except Exception as e:
             print(f"Error delete data: {e}")
-# s1 = Mysql()
-# s1.create_import_table()
-# # s1.insert('site1','2023-09-19 10:14:53','user')
-# s1.delete("sdasx")
+

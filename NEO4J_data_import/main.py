@@ -35,9 +35,11 @@ def main(args) -> Result:
             r = loader.load_node()
         loader.get_tree(labelColObject,id,'create_label_col')
         loader.get_tree(virtualTreeObeject,id,'create_tree')
+        loader.set_siteId()
     except Exception as e:
             print(f"Error delete data: {e}")
     load_time = datetime.strptime(time.ctime(), "%a %b %d %H:%M:%S %Y")
+    #插入导入信息
     mysql.insert(args["siteID"],str(load_time),'user')
     return r.to_string()
         

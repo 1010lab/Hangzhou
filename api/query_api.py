@@ -3,6 +3,7 @@ from neo4j_query.query import Query
 from flask_restful import Resource,reqparse
 import math
 from api.utils import *
+from RDBS.db_utils import Mysql
 
 q = Query()
 
@@ -14,7 +15,6 @@ class Converter():
             :param self.node_id: 存放已经添加的节点ID信息
             :param self.count_root: 用于统计在一页中出现的root节点的个数，在图查询中为虚拟root节点，在树查询中为所在虚拟树的根节点
     '''
-
     def __init__(self) -> None:
         self.nodes = []
         self.lines = []
@@ -62,7 +62,7 @@ class Converter():
         return True if id in self.nodes_id else False
 
     def find_line(self, id):
-        return True if id in [line_id.get("id") for line_id in self.lines] else False
+        return True if id and id in [line_id.get("id") for line_id in self.lines] else False
 
     # 去除重复的边
     def unique_line(self):
@@ -399,6 +399,10 @@ class DeleteGraph(Resource):
         parse.add_argument('siteID',required=True)
         args = parse.parse_args()
         summary = q.delete_graph(args.siteID)
+        #创建Mysql实例
+        mysql = Mysql()
+        #删除mysql中的站点记录
+        mysql.delete(args.siteID)
         answer = {"code":200,"message":"","data":summary.counters.__dict__}
         return jsonify(answer)      
 
@@ -530,7 +534,8 @@ class OutStructureQuery(Resource):
             self.convert.unique_line()
             self.root.append(vir_root)
             #若环形关系存在与Lines中则说明有反向关系
-            if self.convert.find_line(q.circle_relation(args.structureId)):
+            circle_relation = q.circle_relation(args.structureId)
+            if self.convert.find_line(circle_relation):
                 #弹出对应的虚拟树根节点
                 self.root.pop() 
                 self.convert.clear()
@@ -541,15 +546,17 @@ class OutStructureQuery(Resource):
             self.lines.append(self.convert.lines)
         nodes,lines = self.unique_node(self.nodes),self.unique_line(self.lines)
         #生成虚拟的根节点以及关系
-        if(len(self.root)>1):
-            vir_node,vir_lines = generate_root_data(self.root)
-            nodes.append(vir_node)
-            for line in vir_lines:
-                lines.append(line)
-            self.root = [vir_node['id']]
+        vir_node,vir_lines = generate_root_data(self.root)
+        nodes.append(vir_node)
+        for line in vir_lines:
+            lines.append(line)
+        self.root = [vir_node['id']]
+        
         res = {"nodes": nodes, "lines": lines,"virtualTree": self.tree_items,"rootid":self.root[0] if len(self.root)>0 else None}
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
+
+
 
 def  generate_root_data(id_list):
     root_id = generate_id()

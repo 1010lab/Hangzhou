@@ -28,11 +28,8 @@ class Result():
         self.relation_num = 0
         self.node_info = []
         self.relation_info = []
-    
-    
+        
     def to_string(self):
-        # res = {'node_num':self.node_num,'relation_num':self.relation_num,
-        #     'node_info':self.node_info,'relation_info':self.relation_info}
         return self.__dict__
     
 class Loader():
@@ -190,6 +187,15 @@ class Loader():
         self.driver.execute_query(rel_type_cypher,database_="neo4j")
         return self.result
     
+    def set_siteId(self):
+        cypher1 = f'''MATCH ()-[r]->()
+                    WHERE NOT EXISTS(r.siteID)  
+                    SET r.siteID = "{self.args["siteID"]}"'''
+        self.graph.run(cypher1)
+        cypher2 = f'''MATCH (n)
+                    WHERE NOT EXISTS(n.siteID) AND EXISTS(n.nodeName) 
+                    SET n.siteID = "{self.args["siteID"]}"'''
+        self.graph.run(cypher2)
 
     def get_tree(self,virtualTreeObject,nodeId,func_name): 
         tree_list=[]
