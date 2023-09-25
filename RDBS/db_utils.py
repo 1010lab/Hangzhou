@@ -16,6 +16,7 @@ class Mysql():
         if cls._instance is None:
             cls._instance = super(Mysql, cls).__new__(cls)
             cls._instance.config()
+            cls._instance.create_import_table()
         return cls._instance
 
     def config(self):
@@ -37,6 +38,7 @@ class Mysql():
         UNIQUE KEY `siteID` (`siteID`) USING BTREE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;'''
         self.cursor.execute(sql)
+        self.db.commit()
 
     def insert(self,*args):
         sql = f'''INSERT INTO `hangzhou`.`import_info` ( `siteID`, `import_time`, `import_user`) VALUES (%s, %s, %s)'''

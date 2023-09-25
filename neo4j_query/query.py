@@ -1,11 +1,18 @@
 from py2neo import Graph
 # from neo4j_query.utils import generate_id
 from neo4j import GraphDatabase
+import os
+from dotenv import load_dotenv
+
+path = os.path.join(os.getcwd(),'.env')
+load_dotenv(path)
+neo4j_user = os.environ.get("NEO4J_USER")
+neo4j_pwd = os.environ.get("NEO4J_PASSWORD")
 
 class Query():
     def __init__(self) -> None:
         URI = "neo4j://localhost"
-        AUTH = ("neo4j", "123")
+        AUTH = (neo4j_user, neo4j_pwd)
 
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
@@ -32,6 +39,15 @@ class Query():
                 WHERE vir.nodeId = '{treeId}'
                 return root'''
         return self._run(cypher)
+
+    #判断节点类型
+    def node_type(self,nodeId):
+        cypher = f'''MATCH (m) 
+                WHERE m.nodeId = '{nodeId}'
+                RETURN labels(m)[0] as label
+                '''
+        records = self._run(cypher)
+        return records[0] if len(records)>0 else None
 
     #用于寻找虚拟树根节点以及孤立节点
     #!存在的问题：当多站点进行图查询时，虚拟的root节点会被认为是孤立节点
@@ -135,33 +151,22 @@ class Query():
         records = self._run(cypher)
         return records
 
-    def tree_query(self,label,treeId,siteID,page_size):
-        pages = {}
-        count = 0
-        while True:
-
-            if label == 'body':
-                cypher = '''MATCH (start:{label}{{siteID:'{siteID}'}})\n'''.format(label=label,siteID=siteID)+\
-                        '''WHERE "{treeId}"  IN start.virtualTreeList\n'''.format(treeId=treeId)+\
-                        '''OPTIONAL MATCH (start)-[r:belong_to]->(end:body)\n'''.format(label=label,siteID=siteID)+\
-                        '''WHERE "{treeId}" in end.virtualTreeList AND "{treeId}" in r.treeId\n'''.format(treeId=treeId)+\
-                        '''RETURN start,r,end\n'''+\
-                        '''SKIP {count}\n'''.format(count= count)+\
-                        '''LIMIT {page_size}'''.format(page_size= page_size)
-            else:
-                cypher = '''MATCH (m:body{{siteID:'{siteID}'}})-[r1:belong_to]->(n:body)\n'''.format(label=label,siteID=siteID)+\
-                        '''WHERE "{treeId}"  IN m.virtualTreeList AND "{treeId}" in n.virtualTreeList AND "{treeId}" in r1.treeId\n'''.format(treeId=treeId)+\
-                        '''WITH COLLECT(r1.relationId) AS rel\n'''+\
-                        '''MATCH (start)-[r:belong_to]-(end)\n'''+\
-                        '''WHERE r.bodyRelationId in rel\n'''+\
-                        '''RETURN start,r,end\n'''+\
-                        '''SKIP {count}\n'''.format(count= count)+\
-                        '''LIMIT {page_size}'''.format(page_size= page_size)
-            records = self._run(cypher)
-            if(len(records) == 0): break   
-            pages[int(count/page_size)] = records
-            count += page_size
-        return pages
+    def tree_query(self,label,treeId,siteID):
+        if label == 'body':
+            cypher = '''MATCH (start:{label}{{siteID:'{siteID}'}})\n'''.format(label=label,siteID=siteID)+\
+                    '''WHERE "{treeId}"  IN start.virtualTreeList\n'''.format(treeId=treeId)+\
+                    '''OPTIONAL MATCH (start)-[r:belong_to]->(end:body)\n'''.format(label=label,siteID=siteID)+\
+                    '''WHERE "{treeId}" in end.virtualTreeList AND "{treeId}" in r.treeId\n'''.format(treeId=treeId)+\
+                    '''RETURN start,r,end\n'''
+        else:
+            cypher = '''MATCH (m:body{{siteID:'{siteID}'}})-[r1:belong_to]->(n:body)\n'''.format(label=label,siteID=siteID)+\
+                    '''WHERE "{treeId}"  IN m.virtualTreeList AND "{treeId}" in n.virtualTreeList AND "{treeId}" in r1.treeId\n'''.format(treeId=treeId)+\
+                    '''WITH COLLECT(r1.relationId) AS rel\n'''+\
+                    '''MATCH (start)-[r:belong_to]-(end)\n'''+\
+                    '''WHERE r.bodyRelationId in rel\n'''+\
+                    '''RETURN start,r,end\n'''
+        records = self._run(cypher)
+        return records
         
     def set_default_color(self,nodeId,color,remark):
         cypher = f'''MATCH (m) 
@@ -176,6 +181,13 @@ class Query():
         cypher = f'''MATCH (ins:instance)-[:is_instance]->(m)
                     WHERE m.nodeId = "{nodeId}"
                     RETURN ins'''
+        return self._run(cypher)
+
+    #查找实体的本体
+    def get_body(self,nodeId):
+        cypher = f'''MATCH (ins:instance)-[:is_instance]-(body)
+                WHERE ins.nodeId = '{nodeId}'
+                RETURN body'''
         return self._run(cypher)
 
     #基于固定属性查询所有结点
@@ -387,24 +399,23 @@ class Query():
     '''
         最小子图查询：
         @para node_list:节点ID列表
+        @method accessibility():用于获取两个节点之间的最短可达路径
     '''
-    def minimal_graph_query(self,node_list):
+    #可达性判断
+    def accessibility(self,start,end,max_level):
         cypher = f'''MATCH (start)
-            WHERE start.nodeId IN {node_list}
-            MATCH (allowlist)
-            WHERE allowlist.nodeId IN node_list
-            WITH start, collect(allowlist) AS allowlistNodes
-            CALL apoc.path.subgraphAll(start, {{
-                relationshipFilter: "belong_to|is_instance",
-                labelFilter: "+body|instance",
-                minLevel: 1,
-                whitelistNodes: allowlistNodes
-            }})
-            YIELD nodes, relationships
-            return nodes,relationships
-            '''
-
-if __name__ == "__main__":
-    q = Query()
-    res = q.outer_ins_relation_query("64e309dff53c3715653685cb/64e30a69f53c3715653685eb","64e309dff53c3715653685cb/64e30a69f53c3715653685f0")
-    print(res)
+        WHERE start.nodeId = '{start}'
+        MATCH (end)
+        WHERE end.nodeId = '{end}'
+        CALL apoc.path.expandConfig(start, {{
+            relationshipFilter: "belong_to|is_instance|is_label",
+            labelFilter: "+body|+instance|+labelCollection|label",
+            minLevel: 1,
+            maxLevel: {max_level},
+            endNodes: [end]
+        }})
+        YIELD path
+        RETURN nodes(path) AS nodes,relationships(path) AS relations,length(path) AS hops
+        ORDER BY hops
+        LIMIT 1'''
+        return self._run(cypher)

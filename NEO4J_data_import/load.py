@@ -5,6 +5,9 @@ import logging
 import time
 from neo4j import GraphDatabase
 from tree import create_tree_node,create_label_col_node
+import os
+from dotenv import load_dotenv
+
 
 #自定义logger对象，用于记录load的操作日志 
 logger = logging.getLogger(__name__)
@@ -17,6 +20,12 @@ file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
+
+#加载环境变量中的neo4j账户信息
+path = os.path.join(os.getcwd(),'.env')
+load_dotenv(path)
+neo4j_user = os.environ.get("NEO4J_USER")
+neo4j_pwd = os.environ.get("NEO4J_PASSWORD")
 
 '''
     自定义Result类，用于记录load的操作结果
@@ -34,9 +43,9 @@ class Result():
     
 class Loader():
     def __init__(self,args) -> None:
-        self.graph = Graph("http://localhost:7474/", auth=("neo4j", "123"))
+        self.graph = Graph("http://localhost:7474/", auth=(neo4j_user, neo4j_pwd))
         URI = "neo4j://localhost"
-        AUTH = ("neo4j", "123")
+        AUTH = (neo4j_user, neo4j_pwd)
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
         self.args = args

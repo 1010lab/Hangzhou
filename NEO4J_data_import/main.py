@@ -37,7 +37,7 @@ def main(args) -> Result:
         loader.get_tree(virtualTreeObeject,id,'create_tree')
         loader.set_siteId()
     except Exception as e:
-            print(f"Error delete data: {e}")
+            print(f"Some Error happening: {e}")
     load_time = datetime.strptime(time.ctime(), "%a %b %d %H:%M:%S %Y")
     #插入导入信息
     mysql.insert(args["siteID"],str(load_time),'user')

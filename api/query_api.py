@@ -57,6 +57,20 @@ class Converter():
                              "labelList": "未导入部分"}
         self.lines.append(line_dict)
 
+    #重载方法,由于python方法不能重载
+    def add_relation_min_graph(self, start_id:str, relation, end_id:str):
+        line_dict = {}
+        properties = relation.__dict__['_properties']
+        line_dict["id"] = properties["relationId"] if properties.get("relationId") else None
+        line_dict["from"] = start_id
+        line_dict["to"] = end_id
+        line_dict["groupId"] = properties["groupId"] if properties.get("groupId") else None
+        line_dict["text"] = properties["relationName"] if properties.get("relationName") else None
+        line_dict["info"] = {"relationType": properties["relationType"] if properties.get("relationType") else None,
+                             "treeId": properties["treeId"] if properties.get("treeId") else None,
+                             "labelList": "未导入部分"}
+        self.lines.append(line_dict)
+
     # 在self.nodeId中查找当前id是否存在
     def find(self, id):
         return True if id in self.nodes_id else False
@@ -80,7 +94,6 @@ class Converter():
         self.nodes = []
         self.lines = []
         self.count_root = 0
-
 
 class GraphQuery(Resource):
     def __init__(self) -> None:
@@ -163,18 +176,19 @@ class GraphQueryWithPage(Resource):
         q.delete_root(str(args.pageNum) + "root")
         return jsonify(answer)
 
-
 # 虚拟树查询
 class TreeQuery(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
         self.items = []
-        self.res = {}
+        self.nodes = []
+        self.lines = []
+        #虚拟树根节点列表
+        self.root = []
 
-    def _convert_data(self, data, treeId):
+    def _convert_data(self, data):
         # 查询结果进行处理，处理成前段需要的格式
-        for page, records in data.items():
-            for record in records:
+            for record in data:
                 start_node = record['start']
                 relation = record['r']
                 end_node = record['end']
@@ -182,39 +196,40 @@ class TreeQuery(Resource):
                 if relation is not None:
                     self.convert.add_relation(start_node, relation, end_node)
                     self.convert.add_node(end_node)
-            root = q.find_root(treeId)
-            if root is not None:
-                self.convert.add_node(root[0]['root'])
-            self.res[page + 1] = {"nodes": self.convert.nodes, "lines": self.convert.lines,
-                                  "totalPage": len(data.keys())}
+            self.nodes.append(self.convert.nodes)
+            self.lines.append(self.convert.lines)
             self.convert.clear()
+
+    def _flatten(self):
+        self.nodes = [element for sublist in self.nodes for element in sublist]
+        self.lines = [element for sublist in self.lines for element in sublist]
 
     # 本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
         # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
         parse.add_argument('label', choices=['body', 'instance'])
-        parse.add_argument('treeId', required=True)
+        parse.add_argument('treeIdList', required=True,type=str,action="append")
         parse.add_argument('siteID', required=True)
-        parse.add_argument('pageSize', type=int, help="请输入int类型数据")
-        parse.add_argument('pageNum', type=int, default=1, help="请输入int类型数据")
         args = parse.parse_args()
-        res = q.tree_query(args.label, args.treeId, args.siteID, args.pageSize)
-        # 查找虚拟树的根节点
-        root = q.find_root(args.treeId)
-        rootId = root[0]['root'].__dict__['_properties']['nodeId'] if len(root) > 0 else []
-        self._convert_data(res, args.treeId)
-
-        # 未查询到内容返回
-        if len(res.keys()) == 0:
-            return jsonify({"code": 200, "message": "", "data": {}})
-        # 页数错误返回
-        if len(res.keys()) < args.pageNum or args.pageNum == 0:
-            response = make_response('''{"message":"请求页数出错"}''', 400)
-            return response
-        self.res[args.pageNum]['rootId'] = rootId
-        answer = {"code": 200, "message": "", "data": self.res[args.pageNum]}
-        return jsonify(answer)
+        for treeId in args.treeIdList:
+            res = q.tree_query(args.label, treeId, args.siteID)
+            # 查找虚拟树的根节点
+            root = q.find_root(treeId)
+            #添加虚拟树根节点
+            rootId = root[0]['root'].__dict__['_properties']['nodeId'] if len(root) > 0 else []
+            self.root.append(rootId)
+            self._convert_data(res)
+        self._flatten()
+        #创建虚拟root节点以及关系
+        vir_node,vir_lines = generate_root_data(self.root)
+        self.nodes.append(vir_node)
+        for line in vir_lines:
+            self.lines.append(line)
+        root = vir_node['id']
+        res = {"nodes": self.nodes, "lines": self.lines, "rootId": root}
+        answer = {"code": 200, "message": "", "data":res}
+        return answer
 
 class SetDefaultColor(Resource):
     def post(self):
@@ -268,10 +283,9 @@ class CountQuery(Resource):
 class OneHopQuery(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
-        self.items = []
-        self.res = {}
+        self.nodes = []
+        self.lines = []
    
-
     def _convert_data(self,data):
         #查询结果进行处理，处理成前段需要的格式
         for record in data:
@@ -283,19 +297,32 @@ class OneHopQuery(Resource):
                 self.convert.add_relation(start_node,relation,end_node)
                 self.convert.add_node(end_node)
         self.convert.unique_line()
-        self.res = {"nodes":self.convert.nodes, "lines":self.convert.lines}
+        self.nodes.append(self.convert.nodes)
+        self.lines.append(self.convert.lines)
         self.convert.clear()
 
+    def _flatten(self):
+        self.nodes = [element for sublist in self.nodes for element in sublist]
+        self.lines = [element for sublist in self.lines for element in sublist]
 
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
         # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
-        parse.add_argument('nodeId',required=True)
+        parse.add_argument('nodeIdList',required=True,type=str,action="append")
         args = parse.parse_args()
-        res = q.one_hop_query(args.nodeId)
-        self._convert_data(res)
-        answer = {"code":200,"message":"","data":self.res}
+        for nodeId in args.nodeIdList:
+            res = q.one_hop_query(nodeId)
+            self._convert_data(res)
+        self._flatten()
+        #创建虚拟root节点以及关系
+        vir_node,vir_lines = generate_root_data(args.nodeIdList)
+        self.nodes.append(vir_node)
+        for line in vir_lines:
+            self.lines.append(line)
+        root = vir_node['id']
+        res = {"nodes": self.nodes, "lines": self.lines, "rootId": root}
+        answer = {"code": 200, "message": "", "data":res}
         return jsonify(answer)
 
 class TypeQuery(Resource):
@@ -451,6 +478,7 @@ class OutStructureQuery(Resource):
         self.tree_items = []
         self.nodes = []
         self.lines = []
+        #虚拟树节点列表
         self.root = []
    
     def unique_line(self,lines):
@@ -472,7 +500,6 @@ class OutStructureQuery(Resource):
 
         return list(unique_dict.values())
 
-
     def _convert_data(self,data):
         #查询结果进行处理，处理成前段需要的格式
         for record in data:
@@ -485,16 +512,6 @@ class OutStructureQuery(Resource):
                 self.convert.add_relation(start_node,relation,end_node)
                 self.convert.add_node(end_node)
         
-    def _convert_data_ex(self,data):
-        for records in data:
-            for record in records:
-                start_node = record['start']
-                relation = record['r']
-                end_node = record['end']
-                self.convert.add_node(start_node)
-                if relation is not None:
-                    self.convert.add_relation(start_node,relation,end_node)
-                    self.convert.add_node(end_node)
     #查找虚拟树集合的交集
     def _find_vir_list(self,lists):
         if len(lists) == 0:
@@ -551,12 +568,85 @@ class OutStructureQuery(Resource):
         for line in vir_lines:
             lines.append(line)
         self.root = [vir_node['id']]
-        
-        res = {"nodes": nodes, "lines": lines,"virtualTree": self.tree_items,"rootid":self.root[0] if len(self.root)>0 else None}
+        res = {"nodes": nodes, "lines": lines,"virtualTree": self.tree_items,"rootId":self.root[0] if len(self.root)>0 else None}
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
 
+class MinimalGraph(Resource):
+     
+    def __init__(self) -> None:
+        self.convert = Converter()
+        self.tree_items = []
+        self.nodes = []
+        self.lines = []
+        self.root = []
 
+    def traverse(self,node_list):
+        # 双队列存在的问题：存在边或顶点覆盖的问题，可能的解决方式：
+        # 1.直接将其加入到节点中，再去重
+        # 2.使用集合set
+
+        #用于存放nodeId
+        nodes_map = {}
+        lines_map = {}
+        for i in range(len(node_list)-1):
+            #节点id
+            start_id = node_list[i]
+            body_id = None
+            #节点类型
+            # node_type = q.node_type(start_id).data().get('label')
+            max_level = 7
+            #若为实体节点则转向对应的body节点并使用max_level减一
+            # if node_type == 'instance':
+            #     #对应本体Id
+            #     body_id = q.get_body(start_id)[0].data().get('body').get('nodeId')
+            #     max_level -= 1
+            #找到两个点的可达路径中的最短边
+            for j in range(i+1,len(node_list)):
+                end_id = node_list[j]
+                #若开始节点和终止节点都在map中则证明该节点已经包含在图中
+                if(start_id in nodes_map and end_id in nodes_map):continue
+                if body_id: res = q.accessibility(body_id,end_id,max_level)
+                else: res = q.accessibility(start_id,end_id,max_level)
+                #若无结果则说明无最小子图
+                #遍历节点查找出对应的节点nodeId
+                #可以省略，直接查出relation
+                if not res: continue
+                for node in res[0]['nodes']:
+                    ID = node.__dict__.get('_properties')['nodeId']
+                    if ID in nodes_map: continue
+                    nodes_map[ID] = node
+                for relation in res[0]['relations']:
+                    r_dict = relation.__dict__
+                    start_node = r_dict.get('_start_node')
+                    inner_start_id =  start_node.__dict__.get('_properties')['nodeId']
+                    end_node = r_dict.get('_end_node')
+                    inner_end_id =  end_node.__dict__.get('_properties')['nodeId']
+                    line_key = inner_start_id+','+inner_end_id
+                    if line_key in lines_map:continue
+                    lines_map[line_key] = relation
+        return nodes_map,lines_map
+
+    def _convert_data(self,nodes_map,lines_map):
+        #查询结果进行处理，处理成前段需要的格式
+        for _,node in nodes_map.items():
+            self.convert.add_node(node)
+        for tup,line in lines_map.items():
+            #拿出startNode和endNode的id
+            start_id,end_id = tup.split(',')
+            self.convert.add_relation_min_graph(start_id,line,end_id) 
+
+    #本体/实体个数统计查询,若未指定类型返回总节点数
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('nodeList',required=True,type=str,action="append")
+        args = parse.parse_args()
+        nodes_map, lines_map = self.traverse(args.nodeList)
+        self._convert_data(nodes_map,lines_map)
+        res = {"node":self.convert.nodes,"lines":self.convert.lines}
+        return jsonify(res)
+        #获得该表结构的根节点nodeId
+        
 
 def  generate_root_data(id_list):
     root_id = generate_id()

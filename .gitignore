@@ -7,3 +7,4 @@ requirements.txt
 /NEO4J_data_import/__pycache__
 .vscode
 .env
+.ipynb
