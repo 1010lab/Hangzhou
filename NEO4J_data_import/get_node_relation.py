@@ -37,8 +37,8 @@ class GetNodeRelation():
                 writer.writerow(row)
 
     def reponse(self,type):
-        #站点数据接口
-        url = 'http://10.215.28.201/deep/site/Knowledge/' + type
+          #站点数据接口
+        url = 'http://10.215.28.242/deep/site/Knowledge/' + type
         # url = "https://deepctest.hdec.com/deep/site/Knowledge/" + type
         # 构建请求的参数
         data = {
@@ -54,7 +54,6 @@ class GetNodeRelation():
             "Authorization" : "eyJhbGciOiJIUzUxMiIsInppcCI6IkRFRiJ9.eNocjMsKwjAQRf9l1i2kyeTRLgUXguLGnbhImlHqow1NFEX8d4dyd_eee76QnwE6MNgrq8JZRRFdj-RRRS2pgQoGX6BrTIsoGuMsFznzIxKlukw3GutM84tmRq9l4MVpi5ojjPMohfTGkexDkAKp9d4wSO-0OLVp7eJMND_YejxVcJ8uw3j4JGLVbr_abNfw-wMAAP__.VnnJbCzrLBtBdhrVr64RxD0P2fK9LCa8QkKn97SuFbfEcYM0NHW6NsdjeaLctrUDrG27VIH5pvK6m67lGlxnEg",
             "Content-Type" : "application/json"
         }
-        # 发送 POST 请求
         response = requests.post(url, data=payload, headers=headers)
         assert  response.status_code== 200,f"接受返回码错误:{response.status_code}"
         # 获取响应结果

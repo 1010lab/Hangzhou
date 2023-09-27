@@ -66,7 +66,6 @@ class Processor():
                                                             apply(ast.literal_eval)
         labelColList = labelColObject.apply(lambda x: [item['id'] for item in x])
         labelColList = labelColList.apply(lambda x: ",".join(x) if x!=[] else 'null')                                                    
-        
         # virtualTreeList = node_df['virtualTreeList']
         virtualTreeObeject = node_df['virtualTreeList'].fillna('[]').\
                                                 apply(ast.literal_eval)

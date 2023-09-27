@@ -259,6 +259,12 @@ class Query():
             )
         return summary        
 
+    def get_node_info(self,nodeIdList):
+        cypher = f'''MATCH (m) 
+                    WHERE m.nodeId in {nodeIdList}
+                    RETURN m'''
+        return self._run(cypher)
+
     '''
         表结构组查询:
         表内结构查询，查询表结构路径上的所有本体实体以及各自关系
@@ -269,7 +275,8 @@ class Query():
     #根据表结构id查询表结构中的节点以及关系
     def structure_query(self,structureId):
         cypher =f'''MATCH p = (start)-[r]->(end)
-                    WHERE '{structureId}' IN  start.structureList AND '{structureId}' IN  end.structureList
+                    WHERE '{structureId}' IN  start.structureList AND '{structureId}' IN  end.structureList 
+                    AND '{structureId}' IN r.structureList
                     RETURN  start,r,end'''
         return self._run(cypher)
     
@@ -277,6 +284,7 @@ class Query():
     def sc_instance_query(self,structureId):
         cypher =f'''MATCH p = (start1)-[r1]->(end1)
                     WHERE '{structureId}' IN  start1.structureList AND '{structureId}' IN  end1.structureList
+                    AND '{structureId}' IN r1.structureList
                     WITH COLLECT(start1) + COLLECT(end1) AS combinedNodes
                     MATCH (start)-[r:is_instance]->(end)
                     WHERE end IN combinedNodes
@@ -287,6 +295,7 @@ class Query():
     def sc_ins_realtion_query(self,structureId):
         cypher =f'''MATCH p = (start1)-[r1]->(end1)
                     WHERE '{structureId}' IN  start1.structureList AND '{structureId}' IN  end1.structureList
+                    AND '{structureId}' IN r1.structureList
                     WITH r1.relationId AS rid
                     MATCH (start)-[r:belong_to]->(end) 
                     WHERE r.bodyRelationId = rid

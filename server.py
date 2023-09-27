@@ -29,8 +29,10 @@ api.add_resource(ShortestPathQury,'/query/shortestPathQury')
 api.add_resource(ByAttributeQuery,'/query/byAttributeQuery')
 api.add_resource(SetDefaultColor,'/query/setDefaultColor')
 api.add_resource(DeleteGraph,'/deleteGraph')
+api.add_resource(GetNodeInfo,'/query/getNodeInfo')
 api.add_resource(InStructureQuery,'/query/inStructureQuery')
 api.add_resource(OutStructureQuery,'/query/outStructureQuery')
+api.add_resource(StructureBodyQuery,'/query/structureBodyQuery')
 api.add_resource(MinimalGraph,'/query/minimalGraph')
 
 
