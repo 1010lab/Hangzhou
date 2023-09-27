@@ -6,13 +6,13 @@ from dotenv import load_dotenv
 
 path = os.path.join(os.getcwd(),'.env')
 load_dotenv(path)
-neo4j_user = os.environ.get("NEO4J_USER")
-neo4j_pwd = os.environ.get("NEO4J_PASSWORD")
+NEO4J_USER = os.environ.get("NEO4J_USER")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 class Query():
     def __init__(self) -> None:
         URI = "neo4j://localhost"
-        AUTH = (neo4j_user, neo4j_pwd)
+        AUTH = (NEO4J_USER, NEO4J_PASSWORD)
 
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
@@ -212,11 +212,11 @@ class Query():
         return records[0]['count']
 
     #body/instance一跳关系查询
-    def one_hop_query(self,nodeId):
+    def one_hop_query(self,nodeId,label):
         #label冗余对接是否保留
-        cypher =  f'''MATCH (start)-[r]-(end)
+        cypher =  f'''MATCH (start{":"+label if label else ""})-[r]-(end{":"+label if label else ""})
                       WHERE start.nodeId = '{nodeId}' AND TYPE(r) in ["belong_to","is_instance"]
-                      AND EXISTS(end.nodeName)
+                      AND EXISTS(end.nodeName) AND end.snType IN ["0","1"]
                       RETURN start,r, end'''
         return self._run(cypher)
 

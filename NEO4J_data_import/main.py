@@ -12,12 +12,12 @@ def main(args) -> Result:
     mysql = Mysql()
     # getBodyNodeAndRelation or getInstanceNodeAndRelation
     #获取BODY和INSTANCE数据并处理为CSV文件
-    gnr = GetNodeRelation(args)
-    # 校验码：站点数据中没有snRelationList数据->10,否则->11
-    check_code1 = gnr.save2csv("getBodyNodeAndRelation")
-    check_code2 = gnr.save2csv("getInstanceNodeAndRelation")
-    # check_code1 = 11
-    # check_code2 = 11
+    # gnr = GetNodeRelation(args)
+    # # 校验码：站点数据中没有snRelationList数据->10,否则->11
+    # check_code1 = gnr.save2csv("getBodyNodeAndRelation")
+    # check_code2 = gnr.save2csv("getInstanceNodeAndRelation")
+    check_code1 = 11
+    check_code2 = 11
     #Processor处理CSV文件
     p = Processor(args)
     #Loader导入数据

@@ -24,8 +24,8 @@ logger.addHandler(file_handler)
 #加载环境变量中的neo4j账户信息
 path = os.path.join(os.getcwd(),'.env')
 load_dotenv(path)
-neo4j_user = os.environ.get("NEO4J_USER")
-neo4j_pwd = os.environ.get("NEO4J_PASSWORD")
+NEO4J_USER = os.environ.get("NEO4J_USER")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 '''
     自定义Result类，用于记录load的操作结果
@@ -43,9 +43,9 @@ class Result():
     
 class Loader():
     def __init__(self,args) -> None:
-        self.graph = Graph("http://localhost:7474/", auth=(neo4j_user, neo4j_pwd))
+        self.graph = Graph("http://localhost:7474/", auth=(NEO4J_USER, NEO4J_PASSWORD))
         URI = "neo4j://localhost"
-        AUTH = (neo4j_user, neo4j_pwd)
+        AUTH = (NEO4J_USER, NEO4J_PASSWORD)
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
         self.args = args
@@ -69,25 +69,11 @@ class Loader():
         logger.info('******导入程序已启动*******')
         logger.info('******导入站点:'+self.args.siteID+'*******')
         #导入BODY的cypher语句
-        # body_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args.siteID+'\\BODY.csv') +\
-        #               '''CREATE (n:{label} {{
-        #                     nodeId:line.id,nodeName:line.node_name,
-        #                     snType:line.sn_type,type:COALESCE(line.type,[]) ,
-        #                     virtualTreeList:split(line.virtualTreeList, ','),
-        #                     structureList:split(line.structureList,','),
-        #                     lastSiteNode:COALESCE(line.lastSiteNode, 'null'),
-        #                     labelColList:split(line.labelColList,','),
-        #                     remark:"备注信息",
-        #                     fileType:COALESCE(line.fileType,'null'),
-        #                     siteID:"{siteID}"
-        #                 }})\n'''.format(label='body',siteID = self.args["siteID"]) +\
-        #                '''return n'''
         file_name=self.args.siteID+'//BODY.csv'
         body_cypher = f'''CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:['na'],
                 mapping:{{
                             structureList:{{array:true,arraySep:','}},
                             virtualTreeList:{{array:true,arraySep:','}},
-                            sn_type: {{type:'int'}},
                             labelColList:{{array:true,arraySep:','}}
                         }}
                         }})
@@ -112,25 +98,11 @@ class Loader():
         body_res = len(records)
         logger.debug(f'导入本体节点:{body_res},导入时间:{summary.result_available_after}ms')
         #导入BODY的cypher语句
-        # instance_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{file_name}" AS line\n'''.format(file_name=self.args["siteID"]+'\\INSTANCE.csv') +\
-        #                   '''CREATE (n:{label} {{
-        #                         nodeId: COALESCE(line.id, -1),nodeName:line.node_name,
-        #                         snType:line.sn_type,type:COALESCE(line.type,'null'),
-        #                         virtualTreeList:COALESCE(line.virtualTreeList,'null'),
-        #                         structureList:COALESCE(line.structureList,'null'),
-        #                         lastSiteNodeId:COALESCE(line.lastSiteNodeId,'null'),
-        #                         labelColList:split(line.labelColList,','),
-        #                         remark:"备注信息",
-        #                         fileType:COALESCE(line.fileType,'null'),
-        #                         siteID:"{siteID}"
-        #                     }})\n'''.format(label='instance',siteID = self.args["siteID"]) +\
-        #                   '''return n'''
         file_name=self.args["siteID"]+'//INSTANCE.csv'
         instance_cypher = f'''CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:['na'],
                 mapping:{{
                             structureList:{{array:true,arraySep:','}},
                             virtualTreeList:{{array:true,arraySep:','}},
-                            sn_type: {{type:'int'}},
                             labelColList:{{array:true,arraySep:','}}
                         }}
                         }})
@@ -164,6 +136,7 @@ class Loader():
         relation2_cypher = '''CALL apoc.load.csv("file:///{relation_file}")\n'''.format(relation_file=relation2_filename) +\
             '''YIELD map AS line\n'''+\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
+            f'''WHERE from.siteID = "{self.args.siteID}" AND to.siteID = "{self.args.siteID}"'''+\
             '''CREATE (from)-[r:{relation}]-> (to)\n'''.format(relation="is_instance",siteID = self.args["siteID"]) +\
             '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"])+\
             '''RETURN r'''
@@ -184,42 +157,28 @@ class Loader():
         body_relation_filename = os.path.join(self.args["siteID"]+'/body_relation.csv')
         #导入BODY关系的cypher语句
         if(os.path.exists(self.import_dir+'/body_relation.csv')):
-            # file_name = body_relation_filename
-            # body_relation_cypher = f'''CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:['na'],
-            #     mapping:{{
-            #                 structureList:{{array:true,arraySep:','}},
-            #                 virtualTreeList:{{array:true,arraySep:','}},
-            #                 sn_type: {{type:'int'}},
-            #                 treeId:{{array:true,arraySep:','}}
-            #             }}
-            #             }})
-            #     YIELD map AS line
-            #     MATCH (from{{nodeId:line.startId}}),(to{{nodeId:line.endId}})
-            #     CREATE (from)-[r:belong_to{{
-            #         relationType:line.relationType,
-            #         relationId:line.relationId,
-            #         relationName:line.relationName,
-            #         labelList:COALESCE(line.labelList,'null'),
-            #         structureList:split(line.structureList,','),
-            #         treeId:split(line.treeId, ','),
-            #         treeName:COALESCE(line.treeName,'null')
-            #     }}]-> (to)
-            #     SET r.siteID = "{self.args.siteID}"
-            #     return r'''
-            # print(body_relation_cypher)
-            body_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=body_relation_filename) +\
-                '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
-                '''CREATE (from)-[r:{relation}{{
+            file_name = body_relation_filename
+            body_relation_cypher = f'''CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:['na'],
+                mapping:{{
+                            structureList:{{array:true,arraySep:','}},
+                            virtualTreeList:{{array:true,arraySep:','}},
+                            treeId:{{array:true,arraySep:','}}
+                        }}
+                        }})
+                YIELD map AS line
+                MATCH (from{{nodeId:line.startId}}),(to{{nodeId:line.endId}})
+                WHERE from.siteID = "{self.args.siteID}" AND to.siteID = "{self.args.siteID}"
+                CREATE (from)-[r:belong_to{{
                     relationType:line.relationType,
                     relationId:line.relationId,
                     relationName:line.relationName,
-                    labelList:COALESCE(line.labelList,'null'),
-                    structureList:split(line.structureList,','),
-                    treeId:split(line.treeId, ','),
-                    treeName:COALESCE(line.treeName,'null')
-                }}]-> (to)\n'''.format(relation="belong_to",siteID = self.args["siteID"]) +\
-                '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"])+\
-                '''RETURN r'''
+                    labelList:line.labelList,
+                    structureList:line.structureList,
+                    treeId:line.treeId,
+                    treeName:line.treeName
+                }}]-> (to)
+                SET r.siteID = "{self.args.siteID}"
+                return r'''
             #运行cypher,body_relation_res记录返回关系r信息
             records,summary,keys = self.driver.execute_query(
                     body_relation_cypher,
@@ -235,12 +194,14 @@ class Loader():
         if(os.path.exists(self.import_dir+'/instance_relation.csv')):
             instance_relation_filename = os.path.join(self.args["siteID"]+'/instance_relation.csv')
             #导入INSTANCE关系的cypher语句
-            instance_relation_cypher = '''LOAD CSV WITH HEADERS FROM "file:///{relation_file}" AS line\n'''.format(relation_file=instance_relation_filename) +\
+            instance_relation_cypher = f'''CALL apoc.load.csv("file:///{instance_relation_filename}" ,{{nullValues:['na']}})
+                YIELD map AS line\n'''+\
                 '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
+                f'''WHERE from.siteID = "{self.args.siteID}" AND to.siteID = "{self.args.siteID}"'''+\
                 '''CREATE (from)-[r:{relation}{{
                     relationId:line.relationId,
-                    bodyRelationId:COALESCE(line.bodyRelationId,'null'),
-                    groupId:COALESCE(line.groupId,'null')
+                    bodyRelationId:line.bodyRelationId,
+                    groupId:line.groupId
                     }}]-> (to)\n'''.format(relation="belong_to") +\
                 '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"]) +'''RETURN r'''
             #运行cypher,instance_relation_res记录返回关系r信息

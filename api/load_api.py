@@ -1,6 +1,12 @@
 from flask import request,jsonify
 from NEO4J_data_import.main import *
 from flask_restful import Resource,reqparse
+import os
+from dotenv import load_dotenv
+
+path = os.path.join(os.getcwd(),'.env')
+load_dotenv(path)
+NEO4J_PATH = os.environ.get("NEO4J_PATH")
 
 '''
     args = {} ->
@@ -15,7 +21,7 @@ class LoadApi(Resource):
         pass
 
     def convert_args(self,args):
-        args["NEO4J_PATH"] = args["neo4jPath"]
+        args["NEO4J_PATH"] = NEO4J_PATH
         args["DATA_PATH"] = args["dataPath"]
         args["NEO4J_DATA_PATH"] = args["neo4jDataPath"]
         return args

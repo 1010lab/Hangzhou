@@ -310,9 +310,10 @@ class OneHopQuery(Resource):
         # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
         parse.add_argument('nodeIdList',required=True,type=str,action="append")
+        parse.add_argument('label',type=str)
         args = parse.parse_args()
         for nodeId in args.nodeIdList:
-            res = q.one_hop_query(nodeId)
+            res = q.one_hop_query(nodeId,args.label)
             self._convert_data(res)
         self._flatten()
         #创建虚拟root节点以及关系
@@ -655,8 +656,9 @@ class MinimalGraph(Resource):
         args = parse.parse_args()
         nodes_map, lines_map = self.traverse(args.nodeList)
         self._convert_data(nodes_map,lines_map)
-        res = {"node":self.convert.nodes,"lines":self.convert.lines}
-        return jsonify(res)
+        res = {"nodes":self.convert.nodes,"lines":self.convert.lines}
+        answer = {"code":200,"message":"","data":res}
+        return jsonify(answer)
         #获得该表结构的根节点nodeId
         
 class StructureBodyQuery(Resource):
