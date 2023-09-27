@@ -255,8 +255,9 @@ class Loader():
             self.result.relation_num += instance_relation_res
             self.result.relation_info.append(f'导入实例关系:{instance_relation_res}')
         #根据bodyrelationId来找出实例关系间的relationType
-        rel_type_cypher = '''MATCH (:instance)-[r1]->(:instance)
+        rel_type_cypher = f'''MATCH (:instance)-[r1]->(:instance)
                         WITH r1,r1.bodyRelationId AS id
+                        WHERE r1.siteID = '{self.args.siteID}'
                         MATCH (:body)-[r2]-(:body)
                         WHERE r2.relationId = id
                         SET r1.relationType = r2.relationType
