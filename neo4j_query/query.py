@@ -345,18 +345,8 @@ class Query():
       
 
     #查找虚拟树根节点,返回根节点id
+    #这里有优化空间直接查找虚拟树Node并找到关系is_root
     def  find_vir_root(self,virId):
-        # count = self.count_tree(virId,"virtualTreeList")
-        # if count == 1:
-        #     f'''MATCH (root:body) 
-        #             WHERE '{virId}' IN  root.virtualTreeList
-        #             AND NOT (root)-[:belong_to]->()
-        #             RETURN root.nodeId AS id'''
-        # else:
-        #     cypher = f'''MATCH p=(n:body)-[:belong_to*]->(root)
-        #                 WHERE '{virId}' IN  n.virtualTreeList AND '{virId}' IN root.virtualTreeList
-        #                 RETURN root.nodeId AS id
-        #                 LIMIT 1'''
         cypher = f'''MATCH (n:body)
             WHERE "{virId}" IN n.virtualTreeList
             OPTIONAL MATCH (n)-[r]->(m)
@@ -412,7 +402,9 @@ class Query():
     '''
     #可达性判断
     def accessibility(self,start,end,max_level):
-        cypher = f'''MATCH (start)
+        cypher = f'''MATCH (b)
+        WHERE b.snType IN ["2","3"]
+        MATCH (start)
         WHERE start.nodeId = '{start}'
         MATCH (end)
         WHERE end.nodeId = '{end}'
@@ -421,7 +413,8 @@ class Query():
             labelFilter: "+body|+instance|+labelCollection|label",
             minLevel: 1,
             maxLevel: {max_level},
-            endNodes: [end]
+            endNodes: [end],
+            blacklistNodes:b
         }})
         YIELD path
         RETURN nodes(path) AS nodes,relationships(path) AS relations,length(path) AS hops

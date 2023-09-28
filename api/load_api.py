@@ -21,7 +21,7 @@ class LoadApi(Resource):
         pass
 
     def convert_args(self,args):
-        args["NEO4J_PATH"] = NEO4J_PATH
+        args["NEO4J_PATH"] = args["neo4jPath"]
         args["DATA_PATH"] = args["dataPath"]
         args["NEO4J_DATA_PATH"] = args["neo4jDataPath"]
         return args
@@ -29,7 +29,7 @@ class LoadApi(Resource):
     def post(self):
         parse = reqparse.RequestParser()
         parse.add_argument("siteID",type=str,required=True,help="站点名称不能为空")
-        parse.add_argument("neo4jPath",type=str,required=True,help="neo4j目录不能为空")
+        parse.add_argument("neo4jPath",type=str,default=NEO4J_PATH)
         parse.add_argument("dataPath",type=str,default=r"NEO4J_data_import/data")
         parse.add_argument("neo4jDataPath",type=str,default=r"NEO4J_data_import/neo4j_data")
         args = parse.parse_args()

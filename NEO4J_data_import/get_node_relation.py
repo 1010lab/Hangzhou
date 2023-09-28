@@ -63,9 +63,9 @@ class GetNodeRelation():
         type = self.parse_dict[type]
         save_path = os.path.join(self.data_dir,type+"_data.json")
         json_result = json.dumps(result,indent=4,ensure_ascii=False)
-        if not os.path.exists(save_path):
-            f = open(save_path,'w',encoding='utf-8')
-            f.write(json_result)
+        # if not os.path.exists(save_path):
+        f = open(save_path,'w',encoding='utf-8')
+        f.write(json_result)
         return result
 
     def save2csv(self,type):

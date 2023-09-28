@@ -253,7 +253,6 @@ class GetInstance(Resource):
                 start_node = record['ins']
                 self.convert.add_node(start_node)
 
-
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
         # req_data = request.get_json(force=True)
@@ -574,8 +573,6 @@ class OutStructureQuery(Resource):
             self.lines.append(self.convert.lines)
         nodes,lines = unique_node(self.nodes),unique_line(self.lines)
         #生成虚拟的根节点以及关系
-        print("1")
-        print(self.root)
         vir_node,vir_lines = generate_root_data(self.root)
         nodes.append(vir_node)
         for line in vir_lines:
@@ -668,6 +665,7 @@ class StructureBodyQuery(Resource):
         self.nodes = []
         self.lines = []
         self.root = []
+        self.root_list = []
         self.tree_items = []
    
     def _convert_data(self,data):
@@ -680,6 +678,12 @@ class StructureBodyQuery(Resource):
             if relation is not None:
                 self.convert.add_relation(start_node,relation,end_node)
                 self.convert.add_node(end_node)
+
+    #清空查询一次表结构的结果
+    def _clear(self):
+        self.root = []
+        self.nodes = []
+        self.lines = []
 
     #查找虚拟树集合的交集
     def _find_vir_list(self,lists):
@@ -695,57 +699,71 @@ class StructureBodyQuery(Resource):
     def post(self):
         # req_data = request.get_json(force=True)
         parse = reqparse.RequestParser()
-        parse.add_argument('structureId',required=True)
+        # parse.add_argument('structureId',required=True,type=str)
+        parse.add_argument('structureIdList',required=True,type=str,action="append")
         args = parse.parse_args()
-        #查询该表结构下的本体以及关系
-        res = q.structure_query(args.structureId)
-        self._convert_data(res)
-        self.nodes.append(self.convert.nodes)
-        self.lines.append(self.convert.lines)
-        #查询表外本体以及关系
-        #获得该表结构的根节点nodeId
-        str_root  = q.find_str_root(args.structureId)
-        if not str_root: return jsonify({"code":200,"message":"","data":"没有该表结构"})
-        #获得该表结构下的所有虚拟树集合
-        vir_list = q.find_vir_list(args.structureId)
-        vir_list  = self._find_vir_list(vir_list)
-        #遍历虚拟树结合找到所有虚拟树的根节点nodeId
-        for vir_nodeId in vir_list:
-            #每次清除一次表数据
+        nodes_list = []
+        lines_list = []
+        for structureId in args.structureIdList:
             self.convert.clear()
-            vir_root = q.find_vir_root(vir_nodeId)
-            vir_name = q.find_vir_name(vir_nodeId)
-            #先判断根节点是否在表内，执行表内的where语句。如果不在表内且根节点不同，则说明存在表外结构
-            if vir_root == str_root or q.is_inner(vir_root,args.structureId): continue
-            res = q.outer_query(vir_root,str_root)
+            #查询该表结构下的本体以及关系
+            res = q.structure_query(structureId)
             self._convert_data(res)
-            self.root.append(vir_root)
-            #若环形关系存在与Lines中则说明有反向关系
-            circle_relation = q.circle_relation(args.structureId)
-            if self.convert.find_line(circle_relation):
-                #弹出对应的虚拟树根节点
-                self.root.pop() 
-                self.convert.clear()
-            #若存在说明存在表外数据
-            else:
-                self.tree_items.append({"id":vir_nodeId,"virtualTreeName":vir_name}) 
             self.nodes.append(self.convert.nodes)
             self.lines.append(self.convert.lines)
-        nodes,lines = unique_node(self.nodes),unique_line(self.lines)
-        #生成虚拟的根节点以及关系
-        #若存在表外，则生成对应表外虚拟树的虚拟root
-        if self.root!=[]:vir_node,vir_lines = generate_root_data(self.root)
-        #若不存在表外，则生成对应表结构根节点的虚拟root
-        else:vir_node,vir_lines = generate_root_data([str_root])
+            #查询表外本体以及关系
+            #获得该表结构的根节点nodeId
+            str_root  = q.find_str_root(structureId)
+            if not str_root: continue
+            #获得该表结构下的所有虚拟树集合
+            vir_list = q.find_vir_list(structureId)
+            vir_list  = self._find_vir_list(vir_list)
+            #遍历虚拟树结合找到所有虚拟树的根节点nodeId
+            for vir_nodeId in vir_list:
+                #每次清除一次表数据
+                self.convert.clear()
+                vir_root = q.find_vir_root(vir_nodeId)
+                vir_name = q.find_vir_name(vir_nodeId)
+                #先判断根节点是否在表内，执行表内的where语句。如果不在表内且根节点不同，则说明存在表外结构
+                if vir_root == str_root or q.is_inner(vir_root,structureId): continue
+                res = q.outer_query(vir_root,str_root)
+                self._convert_data(res)
+                self.root.append(vir_root)
+                #若环形关系存在与Lines中则说明有反向关系
+                circle_relation = q.circle_relation(structureId)
+                if self.convert.find_line(circle_relation):
+                    #弹出对应的虚拟树根节点
+                    self.root.pop() 
+                    self.convert.clear()
+                #若存在说明存在表外数据
+                else:
+                    self.tree_items.append({"id":vir_nodeId,"virtualTreeName":vir_name}) 
+                self.nodes.append(self.convert.nodes)
+                self.lines.append(self.convert.lines)
+            nodes,lines = unique_node(self.nodes),unique_line(self.lines)
+            #生成虚拟的根节点以及关系
+            #若存在表外，则生成对应表外虚拟树的虚拟root
+            if self.root!=[]:vir_node,vir_lines = generate_root_data(self.root,structureId)
+            #若不存在表外，则生成对应表结构根节点的虚拟root
+            else:vir_node,vir_lines = generate_root_data([str_root],structureId)
+            nodes.append(vir_node)
+            for line in vir_lines:
+                lines.append(line)
+            self.root = [vir_node['id']]
+            self.root_list.append(self.root[0])
+            self._clear()
+            nodes_list.append(nodes)
+            lines_list.append(lines)
+        nodes,lines = unique_node(nodes_list),unique_line(lines_list)
+        vir_node,vir_lines = generate_root_data(self.root_list,"_List")
         nodes.append(vir_node)
         for line in vir_lines:
             lines.append(line)
-        self.root = [vir_node['id']]
         res = {
                 "nodes": nodes, 
                 "lines": lines,
                 "virtualTree": self.tree_items,
-                "rootId":self.root[0] if len(self.root)>0 else str_root
+                "rootId":vir_node['id'] 
             }
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
@@ -770,17 +788,17 @@ def unique_node(nodes):
 
     return list(unique_dict.values())
 
-def  generate_root_data(id_list):
+def  generate_root_data(id_list,name=None):
     root_id = generate_id()
     vir_node = {}
-    vir_node["id"] = root_id
+    vir_node["id"] = root_id 
     vir_node["info"] ={
             "defaultColor": "RGBA(255, 255, 255, 1)",
             "fileType": None,
             "remark": "备注信息",
             "snType": None,
             "type": None}
-    vir_node["text"] = "root"
+    vir_node["text"] = "root"+ (name if name else '')
     vir_lines = []
     for id in id_list:
         line_dict = {}

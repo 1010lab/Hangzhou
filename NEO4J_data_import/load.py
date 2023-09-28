@@ -70,14 +70,16 @@ class Loader():
         logger.info('******导入站点:'+self.args.siteID+'*******')
         #导入BODY的cypher语句
         file_name=self.args.siteID+'//BODY.csv'
-        body_cypher = f'''CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:['na'],
+        body_cypher = f'''CALL apoc.periodic.iterate('
+                CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:["na"],
                 mapping:{{
-                            structureList:{{array:true,arraySep:','}},
-                            virtualTreeList:{{array:true,arraySep:','}},
-                            labelColList:{{array:true,arraySep:','}}
+                            structureList:{{array:true,arraySep:","}},
+                            virtualTreeList:{{array:true,arraySep:","}},
+                            labelColList:{{array:true,arraySep:","}}
                         }}
                         }})
                 YIELD map AS line
+                RETURN line','
                 CREATE (n:body {{
                     nodeId:line.id,nodeName:line.node_name,
                     snType:line.sn_type,type:line.type ,
@@ -89,24 +91,27 @@ class Loader():
                     fileType:line.fileType,
                     siteID:"{self.args.siteID}"
                 }})
-                return n'''
+                return n
+                ', {{batchSize:1000, iterateList:true, parallel:true}});'''
         #运行cypher,body_res记录返回结点n信息
         records,summary,keys = self.driver.execute_query(
                 body_cypher,
                 database_="neo4j",
-            )               
-        body_res = len(records)
-        logger.debug(f'导入本体节点:{body_res},导入时间:{summary.result_available_after}ms')
+            )              
+        body_res = records[0].data()['total']
+        logger.debug(f'导入本体节点:{body_res},导入时间:{summary.result_consumed_after}ms')
         #导入BODY的cypher语句
         file_name=self.args["siteID"]+'//INSTANCE.csv'
-        instance_cypher = f'''CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:['na'],
+        instance_cypher = f'''CALL apoc.periodic.iterate('
+                CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:["na"],
                 mapping:{{
-                            structureList:{{array:true,arraySep:','}},
-                            virtualTreeList:{{array:true,arraySep:','}},
-                            labelColList:{{array:true,arraySep:','}}
+                            structureList:{{array:true,arraySep:","}},
+                            virtualTreeList:{{array:true,arraySep:","}},
+                            labelColList:{{array:true,arraySep:","}}
                         }}
                         }})
                 YIELD map AS line
+                RETURN line','
                 CREATE (n:instance {{
                     nodeId:line.id,nodeName:line.node_name,
                     snType:line.sn_type,type:line.type ,
@@ -118,14 +123,15 @@ class Loader():
                     fileType:line.fileType,
                     siteID:"{self.args.siteID}"
                 }})
-                return n'''
+                return n
+                ', {{batchSize:1000, iterateList:true, parallel:true}});'''
         #运行cypher,instance_res记录返回结点n信息
         records,summary,keys = self.driver.execute_query(
                 instance_cypher,
                 database_="neo4j",
             )                    
-        instance_res = len(records)
-        logger.debug(f'导入实体节点:{instance_res},导入时间:{summary.result_available_after}ms')
+        instance_res = records[0].data()['total']
+        logger.debug(f'导入实体节点:{instance_res},导入时间:{summary.result_consumed_after}ms')
         logger.info('导入节点成功')
         #记录导入节点信息
         self.result.node_num += body_res + instance_res
@@ -133,21 +139,24 @@ class Loader():
         self.result.node_info.append(f'导入实体节点:{instance_res}')
         #导入BODY与INSTANCE关系的cypher语句
         relation2_filename = os.path.join(self.args["siteID"]+'/relation_b2i.csv')
-        relation2_cypher = '''CALL apoc.load.csv("file:///{relation_file}")\n'''.format(relation_file=relation2_filename) +\
+        relation2_cypher = '''CALL apoc.periodic.iterate('\n''' +\
+            '''CALL apoc.load.csv("file:///{relation_file}")\n'''.format(relation_file=relation2_filename) +\
             '''YIELD map AS line\n'''+\
+            ''' RETURN line',' '''+\
             '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.endId})\n''' +\
             f'''WHERE from.siteID = "{self.args.siteID}" AND to.siteID = "{self.args.siteID}"'''+\
             '''CREATE (from)-[r:{relation}]-> (to)\n'''.format(relation="is_instance",siteID = self.args["siteID"]) +\
             '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"])+\
-            '''RETURN r'''
+            '''RETURN r'''+\
+            f'''', {{batchSize:1000, iterateList:true, parallel:true}});'''
         #运行cypher,b2i_res记录返回关系r信息
         records,summary,keys = self.driver.execute_query(
                 relation2_cypher,
                 database_="neo4j",
             )     
-        b2i_res = len(records)
+        b2i_res = records[0].data()['total']
         logger.info('导入实体与实例关系成功')
-        logger.debug(f'导入实体-实例关系:{b2i_res},导入时间:{summary.result_available_after}ms')
+        logger.debug(f'导入实体-实例关系:{b2i_res},导入时间:{summary.result_consumed_after}ms')
         #记录导入关系信息
         self.result.relation_num += b2i_res
         self.result.relation_info.append(f'导入实体-实例关系:{b2i_res}')
@@ -158,14 +167,16 @@ class Loader():
         #导入BODY关系的cypher语句
         if(os.path.exists(self.import_dir+'/body_relation.csv')):
             file_name = body_relation_filename
-            body_relation_cypher = f'''CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:['na'],
+            body_relation_cypher = f'''CALL apoc.periodic.iterate('
+                CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:["na"],
                 mapping:{{
-                            structureList:{{array:true,arraySep:','}},
-                            virtualTreeList:{{array:true,arraySep:','}},
-                            treeId:{{array:true,arraySep:','}}
+                            structureList:{{array:true,arraySep:","}},
+                            virtualTreeList:{{array:true,arraySep:","}},
+                            treeId:{{array:true,arraySep:","}}
                         }}
                         }})
                 YIELD map AS line
+                RETURN line','
                 MATCH (from{{nodeId:line.startId}}),(to{{nodeId:line.endId}})
                 WHERE from.siteID = "{self.args.siteID}" AND to.siteID = "{self.args.siteID}"
                 CREATE (from)-[r:belong_to{{
@@ -178,15 +189,16 @@ class Loader():
                     treeName:line.treeName
                 }}]-> (to)
                 SET r.siteID = "{self.args.siteID}"
-                return r'''
+                return r
+                ', {{batchSize:1000, iterateList:true, parallel:true}});'''
             #运行cypher,body_relation_res记录返回关系r信息
             records,summary,keys = self.driver.execute_query(
                     body_relation_cypher,
                     database_="neo4j",
                 )
-            body_relation_res = len(records)
+            body_relation_res = records[0].data()['total']
             logger.info('导入实体关系成功')
-            logger.debug(f'导入实体关系:{body_relation_res},导入时间:{summary.result_available_after}ms')
+            logger.debug(f'导入实体关系:{body_relation_res},导入时间:{summary.result_consumed_after}ms')
             #记录导入关系信息
             self.result.relation_num += body_relation_res
             self.result.relation_info.append(f'导入实体关系:{body_relation_res}')
@@ -194,8 +206,9 @@ class Loader():
         if(os.path.exists(self.import_dir+'/instance_relation.csv')):
             instance_relation_filename = os.path.join(self.args["siteID"]+'/instance_relation.csv')
             #导入INSTANCE关系的cypher语句
-            instance_relation_cypher = f'''CALL apoc.load.csv("file:///{instance_relation_filename}" ,{{nullValues:['na']}})
-                YIELD map AS line\n'''+\
+            instance_relation_cypher = f'''CALL apoc.periodic.iterate('
+                CALL apoc.load.csv("file:///{instance_relation_filename}" ,{{nullValues:["na"]}})
+                YIELD map AS line  RETURN line','\n'''+\
                 '''MATCH (from{nodeId:line.startId}),(to{nodeId:line.pid})\n''' +\
                 f'''WHERE from.siteID = "{self.args.siteID}" AND to.siteID = "{self.args.siteID}"'''+\
                 '''CREATE (from)-[r:{relation}{{
@@ -203,15 +216,17 @@ class Loader():
                     bodyRelationId:line.bodyRelationId,
                     groupId:line.groupId
                     }}]-> (to)\n'''.format(relation="belong_to") +\
-                '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"]) +'''RETURN r'''
+                '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"]) +\
+                '''RETURN r'''+\
+                f'''', {{batchSize:1000, iterateList:true, parallel:true}});'''
             #运行cypher,instance_relation_res记录返回关系r信息
             records,summary,keys = self.driver.execute_query(
                     instance_relation_cypher,
                     database_="neo4j",
                 )
-            instance_relation_res = len(records)
+            instance_relation_res = records[0].data()['total']
             logger.info('导入实例关系成功')
-            logger.debug(f'导入实例关系:{instance_relation_res},导入时间:{summary.result_available_after}ms')
+            logger.debug(f'导入实例关系:{instance_relation_res},导入时间:{summary.result_consumed_after}ms')
             #记录导入关系信息
             self.result.relation_num += instance_relation_res
             self.result.relation_info.append(f'导入实例关系:{instance_relation_res}')
@@ -226,7 +241,7 @@ class Loader():
         self.driver.execute_query(rel_type_cypher,database_="neo4j")
         return self.result
     
-    def set_siteId(self):
+    def set_siteId(self): 
         cypher1 = f'''MATCH ()-[r]->()
                     WHERE NOT EXISTS(r.siteID)  
                     SET r.siteID = "{self.args["siteID"]}"'''
@@ -235,11 +250,14 @@ class Loader():
                     WHERE NOT EXISTS(n.siteID) AND EXISTS(n.nodeName) 
                     SET n.siteID = "{self.args["siteID"]}"'''
         self.graph.run(cypher2)
+        
 
-    def get_tree(self,virtualTreeObject,nodeId,func_name): 
+    def get_tree(self,virtualTreeObject,nodeId,func_name):
+        logger.info("开始时间："+time.ctime())
         tree_list=[]
         tree_id_list = []
         for row,id in zip(virtualTreeObject,nodeId):
+            if row == [] or row is None:continue
             for item in row:
                 #保证创建的虚拟树是唯一的，但其中的值不能更新
                 #创建Node类，不同于Node结点
