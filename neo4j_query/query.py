@@ -401,9 +401,9 @@ class Query():
         @method accessibility():用于获取两个节点之间的最短可达路径
     '''
     #可达性判断
-    def accessibility(self,start,end,max_level):
+    def accessibility(self,start,end,max_level,siteID):
         cypher = f'''MATCH (b)
-        WHERE b.snType IN ["2","3"]
+        WHERE b.snType IN ["2","3"] AND b.siteID = "{siteID}"
         MATCH (start)
         WHERE start.nodeId = '{start}'
         MATCH (end)

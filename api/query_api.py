@@ -222,7 +222,7 @@ class TreeQuery(Resource):
             self._convert_data(res)
         self._flatten()
         #创建虚拟root节点以及关系
-        vir_node,vir_lines = generate_root_data(self.root)
+        vir_node,vir_lines = generate_root_data(self.root) 
         self.nodes.append(vir_node)
         for line in vir_lines:
             self.lines.append(line)
@@ -591,7 +591,7 @@ class MinimalGraph(Resource):
         self.lines = []
         self.root = []
 
-    def traverse(self,node_list):
+    def traverse(self,node_list,siteID):
         # 双队列存在的问题：存在边或顶点覆盖的问题，可能的解决方式：
         # 1.直接将其加入到节点中，再去重
         # 2.使用集合set
@@ -616,8 +616,8 @@ class MinimalGraph(Resource):
                 end_id = node_list[j]
                 #若开始节点和终止节点都在map中则证明该节点已经包含在图中
                 if(start_id in nodes_map and end_id in nodes_map):continue
-                if body_id: res = q.accessibility(body_id,end_id,max_level)
-                else: res = q.accessibility(start_id,end_id,max_level)
+                if body_id: res = q.accessibility(body_id,end_id,max_level,siteID)
+                else: res = q.accessibility(start_id,end_id,max_level,siteID)
                 #若无结果则说明无最小子图
                 #遍历节点查找出对应的节点nodeId
                 #可以省略，直接查出relation
@@ -650,8 +650,9 @@ class MinimalGraph(Resource):
     def post(self):
         parse = reqparse.RequestParser()
         parse.add_argument('nodeList',required=True,type=str,action="append")
+        parse.add_argument('siteID',required=True,type=str)
         args = parse.parse_args()
-        nodes_map, lines_map = self.traverse(args.nodeList)
+        nodes_map, lines_map = self.traverse(args.nodeList,args.siteID)
         self._convert_data(nodes_map,lines_map)
         res = {"nodes":self.convert.nodes,"lines":self.convert.lines}
         answer = {"code":200,"message":"","data":res}
@@ -659,7 +660,7 @@ class MinimalGraph(Resource):
         #获得该表结构的根节点nodeId
         
 class StructureBodyQuery(Resource):
-    
+
     def __init__(self) -> None:
         self.convert = Converter()
         self.nodes = []
