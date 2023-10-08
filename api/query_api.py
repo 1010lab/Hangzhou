@@ -222,12 +222,13 @@ class TreeQuery(Resource):
             self._convert_data(res)
         self._flatten()
         #创建虚拟root节点以及关系
-        vir_node,vir_lines = generate_root_data(self.root) 
-        self.nodes.append(vir_node)
-        for line in vir_lines:
-            self.lines.append(line)
-        root = vir_node['id']
-        res = {"nodes": self.nodes, "lines": self.lines, "rootId": root}
+        # vir_node,vir_lines = generate_root_data(self.root) 
+        # self.nodes.append(vir_node)
+        # for line in vir_lines:
+        #     self.lines.append(line)
+        # root = vir_node['id']
+        # res = {"nodes": self.nodes, "lines": self.lines, "rootId": root}
+        res = {"nodes": self.nodes, "lines": self.lines}
         answer = {"code": 200, "message": "", "data":res}
         return answer
 
@@ -316,12 +317,13 @@ class OneHopQuery(Resource):
             self._convert_data(res)
         self._flatten()
         #创建虚拟root节点以及关系
-        vir_node,vir_lines = generate_root_data(args.nodeIdList)
-        self.nodes.append(vir_node)
-        for line in vir_lines:
-            self.lines.append(line)
-        root = vir_node['id']
-        res = {"nodes": self.nodes, "lines": self.lines, "rootId": root}
+        # vir_node,vir_lines = generate_root_data(args.nodeIdList)
+        # self.nodes.append(vir_node)
+        # for line in vir_lines:
+        #     self.lines.append(line)
+        # root = vir_node['id']
+        # res = {"nodes": self.nodes, "lines": self.lines, "rootId": root}
+        res = {"nodes": self.nodes, "lines": self.lines}
         answer = {"code": 200, "message": "", "data":res}
         return jsonify(answer)
 
@@ -452,12 +454,13 @@ class GetNodeInfo(Resource):
         res = q.get_node_info(args.nodeIdList)
         self._convert_data(res)
         #创建虚拟root节点以及关系
-        vir_node,vir_lines = generate_root_data(args.nodeIdList)
-        self.convert.nodes.append(vir_node)
-        for line in vir_lines:
-            self.convert.lines.append(line)
-        root = vir_node['id']
-        res = {"nodes": self.convert.nodes, "lines": self.convert.lines, "rootId": root}
+        # vir_node,vir_lines = generate_root_data(args.nodeIdList)
+        # self.convert.nodes.append(vir_node)
+        # for line in vir_lines:
+        #     self.convert.lines.append(line)
+        # root = vir_node['id']
+        # res = {"nodes": self.convert.nodes, "lines": self.convert.lines, "rootId": root}
+        res = {"nodes": self.convert.nodes, "lines": self.convert.lines}
         answer = {"code": 200, "message": "", "data":res}
         return jsonify(answer)
 
@@ -744,27 +747,32 @@ class StructureBodyQuery(Resource):
             nodes,lines = unique_node(self.nodes),unique_line(self.lines)
             #生成虚拟的根节点以及关系
             #若存在表外，则生成对应表外虚拟树的虚拟root
-            if self.root!=[]:vir_node,vir_lines = generate_root_data(self.root,structureId)
-            #若不存在表外，则生成对应表结构根节点的虚拟root
-            else:vir_node,vir_lines = generate_root_data([str_root],structureId)
-            nodes.append(vir_node)
-            for line in vir_lines:
-                lines.append(line)
-            self.root = [vir_node['id']]
-            self.root_list.append(self.root[0])
+            # if self.root!=[]:vir_node,vir_lines = generate_root_data(self.root,structureId)
+            # #若不存在表外，则生成对应表结构根节点的虚拟root
+            # else:vir_node,vir_lines = generate_root_data([str_root],structureId)
+            # nodes.append(vir_node)
+            # for line in vir_lines:
+            #     lines.append(line)
+            # self.root = [vir_node['id']]
+            # self.root_list.append(self.root[0])
             self._clear()
             nodes_list.append(nodes)
             lines_list.append(lines)
         nodes,lines = unique_node(nodes_list),unique_line(lines_list)
-        vir_node,vir_lines = generate_root_data(self.root_list,"_List")
-        nodes.append(vir_node)
-        for line in vir_lines:
-            lines.append(line)
+        # vir_node,vir_lines = generate_root_data(self.root_list,"_List")
+        # nodes.append(vir_node)
+        # for line in vir_lines:
+        #     lines.append(line)
+        # res = {
+        #         "nodes": nodes, 
+        #         "lines": lines,
+        #         "virtualTree": self.tree_items,
+        #         "rootId":vir_node['id'] 
+        #     }
         res = {
                 "nodes": nodes, 
                 "lines": lines,
-                "virtualTree": self.tree_items,
-                "rootId":vir_node['id'] 
+                "virtualTree": self.tree_items
             }
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)

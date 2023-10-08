@@ -61,7 +61,7 @@ class Loader():
         assert os.path.exists(data_dir),'源文件不存在'
         for file_name in os.listdir(data_dir):
             file = os.path.join(data_dir,file_name)
-            shutil.copy2(file, self.import_dir)
+            shutil.copy(file, self.import_dir)
     
     def load_node(self) -> Result:
         self.__move__()    
