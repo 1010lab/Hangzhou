@@ -4,7 +4,7 @@ from flask_restful import Resource,reqparse
 import math
 from api.utils import *
 from RDBS.db_utils import Mysql
-
+import copy
 q = Query()
 
 class Converter():
@@ -768,6 +768,28 @@ class StructureBodyQuery(Resource):
             }
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
+
+#表结构：表内查询
+class AccessList(Resource):
+
+    def __init__(self) -> None:
+        pass
+    
+    #本体/实体个数统计查询,若未指定类型返回总节点数
+    def post(self):
+        # req_data = request.get_json(force=True)
+        parse = reqparse.RequestParser()
+        parse.add_argument('startNodeId',required=True,type=str)
+        parse.add_argument('endNodeIdList',required=True,type=str,action='append')
+        args = parse.parse_args()
+        #深复制
+        res_list = copy.deepcopy(args.endNodeIdList)
+        for end_node_id in args.endNodeIdList:
+            res = q.hasPath(args.startNodeId,end_node_id)
+            if not res: res_list.remove(end_node_id)
+        answer = {"code":200,"message":"","data":res_list}
+        return jsonify(answer)
+
 
 
 def unique_line(lines):

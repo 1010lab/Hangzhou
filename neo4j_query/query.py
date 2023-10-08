@@ -240,12 +240,20 @@ class Query():
 
     def shortest_path_query(self,startNodeId,endNodeId):
         cypher = f'''MATCH path = shortestPath((startNode)-[r*]-(endNode)) 
-                WHERE startNode.nodeId= '{startNodeId}' AND endNode.nodeId = '{endNodeId}'
+                WHERE startNode.nodeId= '{startNodeId}' AND endNode.nodeId = '{endNodeId}' AND length(path) <= 7
                 WITH NODES(path) AS allNodes, RELATIONSHIPS(path) AS allRelationships
                 MATCH (start)-[r]->(end) 
                 WHERE  start IN allNodes AND end IN allNodes AND r IN allRelationships
                 RETURN  start,r,end'''
         return self._run(cypher)
+
+    def hasPath(self,startNodeId,endNodeId):
+        cypher = f'''MATCH path = shortestPath((startNode)-[r*]-(endNode)) 
+                WHERE startNode.nodeId= '{startNodeId}' AND endNode.nodeId = '{endNodeId}' 
+                WITH (length(path) > 0 AND length(path)< 7) AS hasPath
+                RETURN hasPath'''
+        records = self._run(cypher)
+        return records[0].data().get('hasPath') if records!=[] else False
 
     def delete_graph(self,siteID):
         cypher =f'''MATCH (n)
@@ -421,3 +429,4 @@ class Query():
         ORDER BY hops
         LIMIT 1'''
         return self._run(cypher)
+

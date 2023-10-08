@@ -232,8 +232,8 @@ class Loader():
             self.result.relation_info.append(f'导入实例关系:{instance_relation_res}')
         #根据bodyrelationId来找出实例关系间的relationType
         rel_type_cypher = f'''MATCH (:instance)-[r1]->(:instance)
-                        WITH r1,r1.bodyRelationId AS id
                         WHERE r1.siteID = '{self.args.siteID}'
+                        WITH r1,r1.bodyRelationId AS id
                         MATCH (:body)-[r2]-(:body)
                         WHERE r2.relationId = id
                         SET r1.relationType = r2.relationType
@@ -297,6 +297,8 @@ class Loader():
             body_node = body_node['n']
             tree_node.create_relation(body_node,'is_root',node,self.graph)
 
+
+    #待优化
     def label_relation(self,tree_node,node,id,childrens):
         #建立标签与节点间的关系
             #查找与对应标准结点的关系

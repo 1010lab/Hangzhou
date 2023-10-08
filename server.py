@@ -34,10 +34,10 @@ api.add_resource(InStructureQuery,'/query/inStructureQuery')
 api.add_resource(OutStructureQuery,'/query/outStructureQuery')
 api.add_resource(StructureBodyQuery,'/query/structureBodyQuery')
 api.add_resource(MinimalGraph,'/query/minimalGraph')
-
+api.add_resource(AccessList,'/query/acessList')
 
 #额外的
 
 if __name__=='__main__':
-    app.run(host="0.0.0.0",threaded=True)
+    app.run(host="0.0.0.0",threaded=True,debug=True)
     # server.serve_forever()

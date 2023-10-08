@@ -1,5 +1,5 @@
 from py2neo import Node,Graph,Relationship
-
+import time
 
 class TreeNode:
     #先不处理root属性
