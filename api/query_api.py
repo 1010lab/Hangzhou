@@ -3,7 +3,7 @@ from neo4j_query.query import Query
 from flask_restful import Resource,reqparse
 import math
 from api.utils import *
-from RDBS.db_utils import Mysql
+# from RDBS.db_utils import Mysql
 import copy
 q = Query()
 
@@ -427,9 +427,9 @@ class DeleteGraph(Resource):
         args = parse.parse_args()
         summary = q.delete_graph(args.siteID)
         #创建Mysql实例
-        mysql = Mysql()
+        # mysql = Mysql()
         #删除mysql中的站点记录
-        mysql.delete(args.siteID)
+        # mysql.delete(args.siteID)
         answer = {"code":200,"message":"","data":summary.counters.__dict__}
         return jsonify(answer)      
 
@@ -774,7 +774,7 @@ class AccessList(Resource):
 
     def __init__(self) -> None:
         pass
-    
+
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
         # req_data = request.get_json(force=True)

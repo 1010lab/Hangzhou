@@ -3,13 +3,13 @@ sys.path.append('./NEO4J_data_import')
 from get_node_relation import GetNodeRelation
 from process import Processor
 from load import Loader,Result
-from RDBS.db_utils import Mysql
+# from RDBS.db_utils import Mysql
 import time
 from datetime import datetime
 
 def main(args) -> Result:
     #定义mysql数据库实例，用于存储导入记录
-    mysql = Mysql()
+    # mysql = Mysql()
     # getBodyNodeAndRelation or getInstanceNodeAndRelation
     #获取BODY和INSTANCE数据并处理为CSV文件
     gnr = GetNodeRelation(args)
@@ -40,7 +40,7 @@ def main(args) -> Result:
             print(f"Some Error happening: {e}")
     load_time = datetime.strptime(time.ctime(), "%a %b %d %H:%M:%S %Y")
     #插入导入信息
-    mysql.insert(args["siteID"],str(load_time),'user')
+    # mysql.insert(args["siteID"],str(load_time),'user')
     return r.to_string()
         
 
