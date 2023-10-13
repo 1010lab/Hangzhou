@@ -6,7 +6,7 @@ from flask_cors import CORS
 # from gevent import pywsgi
 #获取具体的服务
 
-from api.load_api import LoadApi
+from api.load_api import LoadApi,LoadApiEx
 from api.query_api import *
 
 app=Flask(__name__)
@@ -16,7 +16,8 @@ CORS(app, resources=r'/*',supports_credentials=True)
 api = Api(app)
 
 
-api.add_resource(LoadApi,'/loadNodeAndRelationToNeo4j')
+# api.add_resource(LoadApi,'/loadNodeAndRelationToNeo4j')
+api.add_resource(LoadApiEx,'/loadExtra')
 api.add_resource(GraphQuery,'/query/graphQuery')
 api.add_resource(GraphQueryWithPage,'/query/graphQueryWithPage')
 api.add_resource(TreeQuery,'/query/treeQuery')
@@ -39,5 +40,5 @@ api.add_resource(AccessList,'/query/acessList')
 #额外的
 
 if __name__=='__main__':
-    app.run(host="0.0.0.0",threaded=True,debug=True)
+    app.run(host="0.0.0.0",threaded=True)
     # server.serve_forever()

@@ -9,9 +9,13 @@ load_dotenv(path)
 NEO4J_USER = os.environ.get("NEO4J_USER")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
+#资料包图谱neo4j配置信息
+NEO4J_USER_EX = os.environ.get("NEO4J_USER_EX")
+NEO4J_PASSWORD_EX = os.environ.get("NEO4J_PASSWORD_EX")
+
 class Query():
     def __init__(self) -> None:
-        URI = "neo4j://localhost"
+        URI = "neo4j://10.215.28.242"
         AUTH = (NEO4J_USER, NEO4J_PASSWORD)
 
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
@@ -24,6 +28,15 @@ class Query():
             )            
         return list(records)
 
+    '''
+        查找实体节点
+        @quto: MinmalGraph.is_instance(nodeList)
+    '''
+    def find_instance(self,nodeId):
+        cypher = f'''MATCH (ins:instance) WHERE ins.nodeId="{nodeId}" RETURN ins'''
+        records = self._run(cypher)
+        return records[0].data() if len(records) != 0 else None
+
     #查找虚拟根节点
     def find_vroot(self,siteID):
         rootId = siteID + "root"
@@ -31,7 +44,7 @@ class Query():
                 WHERE root.nodeId = '{rootId}'
                 return root'''
         records = self._run(cypher)
-        return records if len(self._run(cypher)) != 0 else None
+        return records if len(records) != 0 else None
 
     #查找虚拟树中的根节点
     def find_root(self,treeId):
@@ -178,7 +191,7 @@ class Query():
         
     #查找本体下的实例
     def get_instance(self,nodeId):
-        cypher = f'''MATCH (ins:instance)-[:is_instance]->(m)
+        cypher = f'''MATCH (ins:instance)-[:is_instance]->(m:body)
                     WHERE m.nodeId = "{nodeId}"
                     RETURN ins'''
         return self._run(cypher)
@@ -265,7 +278,17 @@ class Query():
                 cypher,
                 database_="neo4j",
             )
-        return summary        
+        #资料包图谱中的对应站点也响应的删除
+        PACKAGE_URI = "bolt://10.215.28.242:7688"
+        PACKAGE_AUTH = (NEO4J_USER, NEO4J_PASSWORD)
+        with GraphDatabase.driver(PACKAGE_URI, auth=PACKAGE_AUTH) as package_driver:
+            package_driver.verify_connectivity()
+        _,summary_ex,_ = self.driver.execute_query(
+                cypher,
+                database_="neo4j",
+            )
+        
+        return {"要素图谱":summary,"资料包图谱":summary_ex}        
 
     def get_node_info(self,nodeIdList):
         cypher = f'''MATCH (m) 
@@ -419,6 +442,28 @@ class Query():
         CALL apoc.path.expandConfig(start, {{
             relationshipFilter: "belong_to|is_instance|is_label",
             labelFilter: "+body|+instance|+labelCollection|label",
+            minLevel: 1,
+            maxLevel: {max_level},
+            endNodes: [end],
+            blacklistNodes:b
+        }})
+        YIELD path
+        RETURN nodes(path) AS nodes,relationships(path) AS relations,length(path) AS hops
+        ORDER BY hops
+        LIMIT 1'''
+        return self._run(cypher)
+
+    #实体可达性判断
+    def instance_accessibility(self,start,end,max_level,siteID):
+        cypher = f'''MATCH (b)
+        WHERE b.snType IN ["2","3"] AND b.siteID = "{siteID}"
+        MATCH (start)
+        WHERE start.nodeId = '{start}'
+        MATCH (end)
+        WHERE end.nodeId = '{end}'
+        CALL apoc.path.expandConfig(start, {{
+            relationshipFilter: "belong_to|is_label",
+            labelFilter: "+instance",
             minLevel: 1,
             maxLevel: {max_level},
             endNodes: [end],

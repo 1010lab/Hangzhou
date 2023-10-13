@@ -87,7 +87,12 @@ class Converter():
 
         self.lines = list(unique_dict.values())
     
-    
+
+    #清空类中所有数据
+    def deep_clear(self):
+        self.nodes = []
+        self.lines = []
+        self.nodes_id = []
 
     # 用于重置页面，清空nodes和lines以及count_root
     def clear(self):
@@ -220,7 +225,7 @@ class TreeQuery(Resource):
             rootId = root[0]['root'].__dict__['_properties']['nodeId'] if len(root) > 0 else []
             self.root.append(rootId)
             self._convert_data(res)
-        self._flatten()
+        # self._flatten()
         #创建虚拟root节点以及关系
         # vir_node,vir_lines = generate_root_data(self.root) 
         # self.nodes.append(vir_node)
@@ -228,6 +233,8 @@ class TreeQuery(Resource):
         #     self.lines.append(line)
         # root = vir_node['id']
         # res = {"nodes": self.nodes, "lines": self.lines, "rootId": root}
+        self.nodes = unique_node(self.nodes)
+        self.lines = unique_line(self.lines)
         res = {"nodes": self.nodes, "lines": self.lines}
         answer = {"code": 200, "message": "", "data":res}
         return answer
@@ -469,6 +476,7 @@ class InStructureQuery(Resource):
 
     def __init__(self) -> None:
         self.convert = Converter()
+
         self.items = []
         self.res = {}
    
@@ -594,11 +602,20 @@ class MinimalGraph(Resource):
         self.lines = []
         self.root = []
 
-    def traverse(self,node_list,siteID):
-        # 双队列存在的问题：存在边或顶点覆盖的问题，可能的解决方式：
-        # 1.直接将其加入到节点中，再去重
-        # 2.使用集合set
+    def is_instance(self,node_list):
+        for node_id in node_list:
+            ##如果该节点不是instance则结束循环
+            if q.find_instance(node_id) is None:
+                return False
+        return True
 
+
+    '''
+        双队列存在的问题：存在边或顶点覆盖的问题，可能的解决方式：
+        1.直接将其加入到节点中，再去重
+        2.使用集合set
+    '''
+    def traverse(self,node_list,siteID,instance_access:bool):
         #用于存放nodeId
         nodes_map = {}
         lines_map = {}
@@ -619,9 +636,13 @@ class MinimalGraph(Resource):
                 end_id = node_list[j]
                 #若开始节点和终止节点都在map中则证明该节点已经包含在图中
                 if(start_id in nodes_map and end_id in nodes_map):continue
-                if body_id: res = q.accessibility(body_id,end_id,max_level,siteID)
-                else: res = q.accessibility(start_id,end_id,max_level,siteID)
+                # if body_id: res = q.accessibility(body_id,end_id,max_level,siteID)
+                if instance_access:
+                    res = q.instance_accessibility(start_id,end_id,max_level,siteID)
+                else:
+                    res = q.accessibility(start_id,end_id,max_level,siteID)
                 #若无结果则说明无最小子图
+                #该部分存在问题：若对应一个节点到列表中其他节点不可达，则应该返回为空（目前还没达到）
                 #遍历节点查找出对应的节点nodeId
                 #可以省略，直接查出relation
                 if not res: continue
@@ -655,9 +676,27 @@ class MinimalGraph(Resource):
         parse.add_argument('nodeList',required=True,type=str,action="append")
         parse.add_argument('siteID',required=True,type=str)
         args = parse.parse_args()
-        nodes_map, lines_map = self.traverse(args.nodeList,args.siteID)
+        #在进行节点列表的最短路径遍历之前，应先判断节点列表是否都为instance
+        all_instance = self.is_instance(args.nodeList) #bool
+        #若全为intance则查找instance间的最短路径
+        if all_instance: 
+            ins_nodes_map,ins_lines_map = self.traverse(args.nodeList,args.siteID,True)
+            self._convert_data(ins_nodes_map,ins_lines_map)
+            instance_shortest_result = {"nodes":self.convert.nodes,"lines":self.convert.lines}
+            
+        #若不全为intance则直接返回空数据
+        else:
+            instance_shortest_result = {"nodes":[],"lines":[]}
+        #查找节点列表中的最小子图(不区分节点标签)
+        nodes_map, lines_map = self.traverse(args.nodeList,args.siteID,False)
+        print(nodes_map)
+        #清空结果,包括记录的存在id
+        self.convert.deep_clear()
         self._convert_data(nodes_map,lines_map)
-        res = {"nodes":self.convert.nodes,"lines":self.convert.lines}
+        print(self.convert.nodes)
+        all_shortest_res = {"nodes":self.convert.nodes,"lines":self.convert.lines}
+        res = {"instance_shortest": instance_shortest_result,
+                "all_shortest":all_shortest_res}
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
         #获得该表结构的根节点nodeId

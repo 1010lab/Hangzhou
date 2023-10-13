@@ -1,5 +1,6 @@
 from flask import request,jsonify
 from NEO4J_data_import.main import *
+from NEO4_import_extra.main_ex import *
 from flask_restful import Resource,reqparse
 import os
 from dotenv import load_dotenv
@@ -26,6 +27,12 @@ class LoadApi(Resource):
         args["NEO4J_DATA_PATH"] = args["neo4jDataPath"]
         return args
 
+    def convert_args_ex(self,args):
+        args["NEO4J_PATH"] = r"D:\neo4j-another\neo4j-community-4.4.18"
+        args["DATA_PATH"] = r"NEO4J_data_import/data"
+        args["NEO4J_DATA_PATH"] = r"NEO4J_data_import/neo4j_data"
+        return args
+
     def post(self):
         parse = reqparse.RequestParser()
         parse.add_argument("siteID",type=str,required=True,help="站点名称不能为空")
@@ -34,7 +41,32 @@ class LoadApi(Resource):
         parse.add_argument("neo4jDataPath",type=str,default=r"NEO4J_data_import/neo4j_data")
         args = parse.parse_args()
         args = self.convert_args(args)
-        r = main(args)
+        res_data = main(args)
+        args = self.convert_args_ex(args)
+        res_package =main_ex(args)
+        # 拼接code，message，data
+        answer = {"code":200,"message":"","data":{"要素图谱":res_data,"资料包图谱":res_package}}
+        return jsonify(answer)
+
+class LoadApiEx(Resource):
+    def __init__(self) -> None:
+        pass
+
+    def convert_args(self,args):
+        args["NEO4J_PATH"] = args["neo4jPath"]
+        args["DATA_PATH"] = args["dataPath"]
+        args["NEO4J_DATA_PATH"] = args["neo4jDataPath"]
+        return args
+
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument("siteID",type=str,required=True,help="站点名称不能为空")
+        parse.add_argument("neo4jPath",type=str,default=r"D:\neo4j-another\neo4j-community-4.4.18")
+        parse.add_argument("dataPath",type=str,default=r"NEO4_import_extra/data")
+        parse.add_argument("neo4jDataPath",type=str,default=r"NEO4_import_extra/neo4j_data")
+        args = parse.parse_args()
+        args = self.convert_args(args)
+        r = main_ex(args)
         # 拼接code，message，data
         answer = {"code":200,"message":"","data":r}
         return jsonify(answer)
