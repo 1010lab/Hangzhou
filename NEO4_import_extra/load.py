@@ -40,8 +40,7 @@ class Result():
     
 class Loader():
     def __init__(self,args) -> None:
-        URI = "bolt://10.215.28.242:7688"
-        
+        URI = "bolt://localhost:7688"
         AUTH = (NEO4J_USER_EX, NEO4J_PASSWORD_EX)
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
             self.driver.verify_connectivity()
@@ -64,10 +63,9 @@ class Loader():
         self.__move__()    
         #导入节点
         logger.info('******导入资料包及关系程序已启动*******')
-        logger.info('******导入图数据库: '+self.URI+'******')
         logger.info('******导入站点:'+self.args.siteID+'*******')
         #导入BODY的cypher语句
-        file_name=self.args.siteID+'//BODY.csv'
+        file_name=self.args.siteID+'//INSTANCE.csv'
         ins_cypher = f'''CALL apoc.periodic.iterate('
                 CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:["na"]
                         }})

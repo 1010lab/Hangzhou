@@ -38,7 +38,7 @@ class GetNodeRelation():
 
     def reponse(self,type):
           #站点数据接口
-        url = 'http://10.215.28.242/deep/site/Knowledge/' + type
+        url = 'http://192.168.6.128/deep/site/Knowledge/' + type
         # url = "https://deepctest.hdec.com/deep/site/Knowledge/" + type
         # 构建请求的参数
         data = {

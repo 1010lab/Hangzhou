@@ -439,7 +439,7 @@ class DeleteGraph(Resource):
         # mysql = Mysql()
         #删除mysql中的站点记录
         # mysql.delete(args.siteID)
-        answer = {"code":200,"message":"","data":summary.counters.__dict__}
+        answer = {"code":200,"message":"","data":summary}
         return jsonify(answer)      
 
 class GetNodeInfo(Resource):
@@ -609,6 +609,18 @@ class MinimalGraph(Resource):
                 return False
         return True
 
+    def add(self,data):
+        for record in data:
+            start_node = record['start']
+            relation = record['r']
+            end_node = record['end']
+            self.convert.add_node(start_node)
+            if relation is not None:
+                self.convert.add_relation(start_node,relation,end_node)
+                self.convert.add_node(end_node)
+
+        #返回bodyid
+        return end_node.__dict__['_properties']["nodeId"]
 
     '''
         双队列存在的问题：存在边或顶点覆盖的问题，可能的解决方式：
@@ -619,21 +631,46 @@ class MinimalGraph(Resource):
         #用于存放nodeId
         nodes_map = {}
         lines_map = {}
+        length = len(node_list)
+        # #定义两个列表用于存放body以及instance
+        # instance_list = [None]*length
+        # body_list = [None]*length
+        # # 若为实体节点则转向对应的body节点并使用max_level减一
+        # if not instance_access:
+        #     for i in range(length):
+        #         body = q.get_body(node_list[i])
+        #         if body:
+        #             #找出实体本体关系以及对应本体id
+        #             instance_list[i] = self.add_line(body)
+        #             body_list[i] = instance_list[i]["line"][0].split(',')[-1]
+        #         else:
+        #             body_list[i] = node_list[i]
+        #     node_list = body_list
+        #     #当只有一个body节点时m,只需找出对应的body节点
+        #     if len(list(set(body_list))) == 1:
+        #         node = body[0]['end']
+        #         ID = node.__dict__.get('_properties')['nodeId']
+        #         if ID not in nodes_map: nodes_map[ID] = node
         for i in range(len(node_list)-1):
             #节点id
             start_id = node_list[i]
-            body_id = None
-            #节点类型
-            # node_type = q.node_type(start_id).data().get('label')
+            #当instance_accesss=False时，找到其body节点
             max_level = 7
-            #若为实体节点则转向对应的body节点并使用max_level减一
-            # if node_type == 'instance':
-            #     #对应本体Id
-            #     body_id = q.get_body(start_id)[0].data().get('body').get('nodeId')
-            #     max_level -= 1
+            if not instance_access:
+                triple = q.get_body(node_list[i])
+                if triple:
+                    max_level -= 1
+                    #将body、instance、以及他们之间的关系引入到Convert类中
+                    start_id = self.add(triple)
             #找到两个点的可达路径中的最短边
             for j in range(i+1,len(node_list)):
                 end_id = node_list[j]
+                if not instance_access:
+                    triple = q.get_body(node_list[j])
+                    if triple:
+                        max_level -= 1
+                        #将body、instance、以及他们之间的关系引入到Convert类中
+                        end_id = self.add(triple)
                 #若开始节点和终止节点都在map中则证明该节点已经包含在图中
                 if(start_id in nodes_map and end_id in nodes_map):continue
                 # if body_id: res = q.accessibility(body_id,end_id,max_level,siteID)
@@ -648,8 +685,7 @@ class MinimalGraph(Resource):
                 if not res: continue
                 for node in res[0]['nodes']:
                     ID = node.__dict__.get('_properties')['nodeId']
-                    if ID in nodes_map: continue
-                    nodes_map[ID] = node
+                    if ID not in nodes_map: nodes_map[ID] = node
                 for relation in res[0]['relations']:
                     r_dict = relation.__dict__
                     start_node = r_dict.get('_start_node')
@@ -659,6 +695,16 @@ class MinimalGraph(Resource):
                     line_key = inner_start_id+','+inner_end_id
                     if line_key in lines_map:continue
                     lines_map[line_key] = relation
+        #添加instane的节点以及边到nodes_map中
+        # for item in instance_list:
+        #     #若不为空
+        #     if item:
+        #         node = item.get("node")
+        #         ID = node.__dict__.get('_properties')['nodeId']
+        #         if ID in nodes_map: nodes_map[ID] = node
+        #         line = item.get("line")
+                
+        #         lines_map[line[0]] = line[1]
         return nodes_map,lines_map
 
     def _convert_data(self,nodes_map,lines_map):
@@ -670,33 +716,37 @@ class MinimalGraph(Resource):
             start_id,end_id = tup.split(',')
             self.convert.add_relation_min_graph(start_id,line,end_id) 
 
+    def process(self,args):
+        #在进行节点列表的最短路径遍历之前，应先判断节点列表是否都为instance
+        all_instance = self.is_instance(args.nodeList) #bool
+        #若全为intance则查找instance间的最短路径,并且找出其本体路径
+        if all_instance: 
+            ins_nodes_map,ins_lines_map = self.traverse(args.nodeList,args.siteID,True)
+            self._convert_data(ins_nodes_map,ins_lines_map)
+            instance_result = {"nodes":self.convert.nodes,"lines":self.convert.lines}
+        #若不全为intance则直接返回空数据
+        else:
+            instance_result = {"nodes":[],"lines":[]}
+        #清空结果,包括记录的存在id
+        self.convert.deep_clear()
+        #查找节点列表中的最小子图(不区分节点标签)
+        nodes_map, lines_map = self.traverse(args.nodeList,args.siteID,False)
+        self._convert_data(nodes_map,lines_map)
+        self.convert.unique_line()
+        all_shortest_res = {"nodes":self.convert.nodes,
+                            "lines":self.convert.lines}
+        return instance_result,all_shortest_res
+
     #本体/实体个数统计查询,若未指定类型返回总节点数
     def post(self):
         parse = reqparse.RequestParser()
         parse.add_argument('nodeList',required=True,type=str,action="append")
         parse.add_argument('siteID',required=True,type=str)
         args = parse.parse_args()
-        #在进行节点列表的最短路径遍历之前，应先判断节点列表是否都为instance
-        all_instance = self.is_instance(args.nodeList) #bool
-        #若全为intance则查找instance间的最短路径
-        if all_instance: 
-            ins_nodes_map,ins_lines_map = self.traverse(args.nodeList,args.siteID,True)
-            self._convert_data(ins_nodes_map,ins_lines_map)
-            instance_shortest_result = {"nodes":self.convert.nodes,"lines":self.convert.lines}
-            
-        #若不全为intance则直接返回空数据
-        else:
-            instance_shortest_result = {"nodes":[],"lines":[]}
-        #查找节点列表中的最小子图(不区分节点标签)
-        nodes_map, lines_map = self.traverse(args.nodeList,args.siteID,False)
-        print(nodes_map)
-        #清空结果,包括记录的存在id
-        self.convert.deep_clear()
-        self._convert_data(nodes_map,lines_map)
-        print(self.convert.nodes)
-        all_shortest_res = {"nodes":self.convert.nodes,"lines":self.convert.lines}
-        res = {"instance_shortest": instance_shortest_result,
-                "all_shortest":all_shortest_res}
+        instance_result,all_shortest_res = self.process(args)
+        res = {"instancePath": instance_result,
+                "bodyPath":all_shortest_res
+                }
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
         #获得该表结构的根节点nodeId

@@ -15,7 +15,7 @@ NEO4J_PASSWORD_EX = os.environ.get("NEO4J_PASSWORD_EX")
 
 class Query():
     def __init__(self) -> None:
-        URI = "neo4j://10.215.28.242"
+        URI = "neo4j://localhost"
         AUTH = (NEO4J_USER, NEO4J_PASSWORD)
 
         with GraphDatabase.driver(URI, auth=AUTH) as self.driver:
@@ -196,11 +196,14 @@ class Query():
                     RETURN ins'''
         return self._run(cypher)
 
-    #查找实体的本体
+    '''
+        查找本体节点
+        @quto: MinmalGraph.is_instance(nodeList)
+    '''
     def get_body(self,nodeId):
-        cypher = f'''MATCH (ins:instance)-[:is_instance]-(body)
-                WHERE ins.nodeId = '{nodeId}'
-                RETURN body'''
+        cypher = f'''MATCH (start:instance)-[r:is_instance]->(end:body)
+                WHERE start.nodeId = '{nodeId}'
+                RETURN start,r,end'''
         return self._run(cypher)
 
     #基于固定属性查询所有结点
@@ -279,7 +282,7 @@ class Query():
                 database_="neo4j",
             )
         #资料包图谱中的对应站点也响应的删除
-        PACKAGE_URI = "bolt://10.215.28.242:7688"
+        PACKAGE_URI = "bolt://localhost:7688"
         PACKAGE_AUTH = (NEO4J_USER, NEO4J_PASSWORD)
         with GraphDatabase.driver(PACKAGE_URI, auth=PACKAGE_AUTH) as package_driver:
             package_driver.verify_connectivity()
@@ -287,8 +290,7 @@ class Query():
                 cypher,
                 database_="neo4j",
             )
-        
-        return {"要素图谱":summary,"资料包图谱":summary_ex}        
+        return {"要素图谱":summary.counters.__dict__,"资料包图谱":summary_ex.counters.__dict__}        
 
     def get_node_info(self,nodeIdList):
         cypher = f'''MATCH (m) 
@@ -440,8 +442,8 @@ class Query():
         MATCH (end)
         WHERE end.nodeId = '{end}'
         CALL apoc.path.expandConfig(start, {{
-            relationshipFilter: "belong_to|is_instance|is_label",
-            labelFilter: "+body|+instance|+labelCollection|label",
+            relationshipFilter: "belong_to|is_label",
+            labelFilter: "+body|+labelCollection|label",
             minLevel: 1,
             maxLevel: {max_level},
             endNodes: [end],
@@ -473,5 +475,6 @@ class Query():
         RETURN nodes(path) AS nodes,relationships(path) AS relations,length(path) AS hops
         ORDER BY hops
         LIMIT 1'''
+        print(cypher)
         return self._run(cypher)
 

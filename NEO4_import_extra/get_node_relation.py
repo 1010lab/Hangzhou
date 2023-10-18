@@ -33,7 +33,7 @@ class GetNodeRelation():
 
     def reponse(self):
           #站点数据接口
-        url = 'http://10.215.28.242:3032/sfm/structuralData/getDocPackageRelation'
+        url = 'http://192.168.6.128/deep/sfm/structuralData/getDocPackageRelation'
         # url = "https://deepctest.hdec.com/deep/site/Knowledge/" + type
         # 构建请求的参数
         data = {
@@ -50,11 +50,9 @@ class GetNodeRelation():
             "Content-Type" : "application/json"
         }
         response = requests.post(url, data=payload, headers=headers)
-        print(response.text)
         assert  response.status_code== 200,f"接受返回码错误:{response.status_code}"
         # 获取响应结果
         result = response.json()
-        print(result)
     
         save_path = os.path.join(self.data_dir,"instance.json")
         json_result = json.dumps(result,indent=4,ensure_ascii=False)
