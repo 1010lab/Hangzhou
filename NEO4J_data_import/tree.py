@@ -34,12 +34,13 @@ class LabelColletionNode:
         self.classificationIds = classificationIds
         self.organizationId = organizationId
 
-    def create_relation(self,body_node,r,tree_node,label_list,graph):
+    def create_relation(self,body_node,r,tree_node,label_list,node_type,graph):
         relation  = Relationship(body_node, r, tree_node) 
         for node in label_list:
             key = node['key']
             value = node['value']
             relation[key] = value
+        relation['lineType'] = "labc-"+node_type
         graph.create(relation)
 
     #先创建对应的label的Node节点，再创建标签组与标签之间的关系
@@ -52,6 +53,7 @@ class LabelColletionNode:
         graph.create(node)
         for label_node in label_node_list:
             relation = Relationship(label_node,'belong_to',node)
+            relation['lineType'] = "lab-labc"
             graph.create(relation)
         return node
     

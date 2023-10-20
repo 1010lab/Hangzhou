@@ -2,6 +2,12 @@ import requests
 import json
 import os
 import csv
+from dotenv import load_dotenv
+
+path = os.path.join(os.getcwd(),'.env')
+load_dotenv(path)
+#资料包数据接口url
+GET_DOC_PACKAGE_RELATION = os.environ.get("GET_DOC_PACKAGE_RELATION")
 
 
 '''
@@ -33,7 +39,7 @@ class GetNodeRelation():
 
     def reponse(self):
           #站点数据接口
-        url = 'http://192.168.6.128/deep/sfm/structuralData/getDocPackageRelation'
+        url = GET_DOC_PACKAGE_RELATION
         # url = "https://deepctest.hdec.com/deep/site/Knowledge/" + type
         # 构建请求的参数
         data = {

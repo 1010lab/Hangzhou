@@ -147,6 +147,7 @@ class Loader():
             f'''WHERE from.siteID = "{self.args.siteID}" AND to.siteID = "{self.args.siteID}"'''+\
             '''CREATE (from)-[r:{relation}]-> (to)\n'''.format(relation="is_instance",siteID = self.args["siteID"]) +\
             '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"])+\
+            '''SET r.lineType = "{lineType}"\n'''.format(lineType = 'ins-ins')+\
             '''RETURN r'''+\
             f'''', {{batchSize:1000, iterateList:true, parallel:true}});'''
         #运行cypher,b2i_res记录返回关系r信息
@@ -167,6 +168,7 @@ class Loader():
         #导入BODY关系的cypher语句
         if(os.path.exists(self.import_dir+'/body_relation.csv')):
             file_name = body_relation_filename
+            lineType = 'body-body'
             body_relation_cypher = f'''CALL apoc.periodic.iterate('
                 CALL apoc.load.csv("file:///{file_name}" ,{{nullValues:["na"],
                 mapping:{{
@@ -189,6 +191,7 @@ class Loader():
                     treeName:line.treeName
                 }}]-> (to)
                 SET r.siteID = "{self.args.siteID}"
+                SET r.lineType = "{lineType}" 
                 return r
                 ', {{batchSize:1000, iterateList:true, parallel:true}});'''
             #运行cypher,body_relation_res记录返回关系r信息
@@ -217,6 +220,7 @@ class Loader():
                     groupId:line.groupId
                     }}]-> (to)\n'''.format(relation="belong_to") +\
                 '''SET r.siteID = "{siteID}"\n'''.format(siteID = self.args["siteID"]) +\
+                '''SET r.lineType = "{lineType}"\n'''.format(lineType = 'ins-ins') +\
                 '''RETURN r'''+\
                 f'''', {{batchSize:1000, iterateList:true, parallel:true}});'''
             #运行cypher,instance_relation_res记录返回关系r信息
@@ -302,10 +306,11 @@ class Loader():
     def label_relation(self,tree_node,node,id,childrens):
         #建立标签与节点间的关系
             #查找与对应标准结点的关系
-        cypher = f'''MATCH (n) WHERE n.nodeId = "{id}" RETURN n'''
+        cypher = f'''MATCH (n) WHERE n.nodeId = "{id}" RETURN n,labels(n) as label'''
         basic_node = self.graph.run(cypher).data()[0]['n']
+        node_type = self.graph.run(cypher).data()[0]['label'][0]
         label_list = [{"key":children.get("name"),"value":children.get("value")} for children in childrens]
-        tree_node.create_relation(node,'is_label',basic_node,label_list,self.graph)
+        tree_node.create_relation(node,'is_label',basic_node,label_list,node_type,self.graph)
 
 
 

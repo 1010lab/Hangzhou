@@ -43,7 +43,8 @@ class LoadApi(Resource):
         args = self.convert_args(args)
         res_data = main(args)
         args = self.convert_args_ex(args)
-        res_package = main_ex(args)
+        # res_package = main_ex(args)
+        res_package = "未导入部分"
         # 拼接code，message，data
         answer = {"code":200,"message":"","data":{"要素图谱":res_data,"资料包图谱":res_package}}
         return jsonify(answer)

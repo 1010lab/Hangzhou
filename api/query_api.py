@@ -3,103 +3,12 @@ from neo4j_query.query import Query
 from flask_restful import Resource,reqparse
 import math
 from api.utils import *
+from api.convert import  Converter
 # from RDBS.db_utils import Mysql
 import copy
 q = Query()
 
-class Converter():
-    '''
-        处理neo4j返回的转换类
-            :param self.nodes: 存放需求格式的节点信息
-            :param self.lines: 存放需求格式的边信息
-            :param self.node_id: 存放已经添加的节点ID信息
-            :param self.count_root: 用于统计在一页中出现的root节点的个数，在图查询中为虚拟root节点，在树查询中为所在虚拟树的根节点
-    '''
-    def __init__(self) -> None:
-        self.nodes = []
-        self.lines = []
-        # 维护一个列表来查看哪些node已经添加到self.nodes里了
-        self.nodes_id = []
-        self.count_root = 0
-
-    # 添加node信息
-    def add_node(self, node=None):
-        node_dict = {}
-        label = str(node).split("rozenset({'")[1].split("'}")[0]
-        properties = node.__dict__['_properties']
-        node_dict["id"] = properties['nodeId']
-        if self.find(properties['nodeId']):
-            return
-        node_dict["text"] = properties["nodeName"] if properties.get("nodeName") else None
-        node_dict["info"] = {"type": properties["type"] if properties.get("type") else None,
-                             "snType": properties["snType"] if properties.get("snType") else None,
-                             "defaultColor": properties['defaultColor'] if properties.
-                                get('defaultColor') else "RGBA(255, 255, 255, 1)",
-                             "remark": properties['remark'] if properties.
-                                get("remark") else None,
-                             "fileType": properties['fileType'] if properties.
-                                get("fileType") != "null" and properties.get("fileType") else None,
-                             "label":label}
-        self.nodes.append(node_dict)
-        self.nodes_id.append(node['nodeId'])
-
-    # 添加line信息
-    def add_relation(self, start_node, relation, end_node):
-        line_dict = {}
-        properties = relation.__dict__['_properties']
-        line_dict["id"] = properties["relationId"] if properties.get("relationId") else None
-        line_dict["from"] = start_node.__dict__['_properties']["nodeId"]
-        line_dict["to"] = end_node.__dict__['_properties']["nodeId"]
-        line_dict["groupId"] = properties["groupId"] if properties.get("groupId") else None
-        line_dict["text"] = properties["relationName"] if properties.get("relationName") else None
-        line_dict["info"] = {"relationType": properties["relationType"] if properties.get("relationType") else None,
-                             "treeId": properties["treeId"] if properties.get("treeId") else None,
-                             "labelList": "未导入部分"}
-        self.lines.append(line_dict)
-
-    #重载方法,由于python方法不能重载
-    def add_relation_min_graph(self, start_id:str, relation, end_id:str):
-        line_dict = {}
-        properties = relation.__dict__['_properties']
-        line_dict["id"] = properties["relationId"] if properties.get("relationId") else None
-        line_dict["from"] = start_id
-        line_dict["to"] = end_id
-        line_dict["groupId"] = properties["groupId"] if properties.get("groupId") else None
-        line_dict["text"] = properties["relationName"] if properties.get("relationName") else None
-        line_dict["info"] = {"relationType": properties["relationType"] if properties.get("relationType") else None,
-                             "treeId": properties["treeId"] if properties.get("treeId") else None,
-                             "labelList": "未导入部分"}
-        self.lines.append(line_dict)
-
-    # 在self.nodeId中查找当前id是否存在
-    def find(self, id):
-        return True if id in self.nodes_id else False
-
-    def find_line(self, id):
-        return True if id and id in [line_id.get("id") for line_id in self.lines] else False
-
-    # 去除重复的边
-    def unique_line(self):
-        unique_dict = {}
-        for item in self.lines:
-            key = (item["from"],item["to"],item["groupId"])
-            unique_dict[key] = item
-
-        self.lines = list(unique_dict.values())
-    
-
-    #清空类中所有数据
-    def deep_clear(self):
-        self.nodes = []
-        self.lines = []
-        self.nodes_id = []
-
-    # 用于重置页面，清空nodes和lines以及count_root
-    def clear(self):
-        self.nodes = []
-        self.lines = []
-        self.count_root = 0
-
+#图查询
 class GraphQuery(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
@@ -250,6 +159,7 @@ class SetDefaultColor(Resource):
         answer = {"code":200,"message":"","data":args.color}
         return jsonify(answer)
 
+#查询对应本体下的实体
 class GetInstance(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
@@ -351,6 +261,7 @@ class TypeQuery(Resource):
             if relation is not None:
                 self.convert.add_relation(start_node,relation,end_node)
                 self.convert.add_node(end_node)
+        self.convert.unique_line()
         self.res = {"nodes":self.convert.nodes, "lines":self.convert.lines}
         self.convert.clear()
 
@@ -366,19 +277,6 @@ class TypeQuery(Resource):
         self._convert_data(res)
         answer = {"code":200,"message":"","data":self.res}
         return jsonify(answer)
-
-class ThreeHopQuery(Resource):
-    def __init__(self) -> None:
-        pass
-
-    def post(self):
-        parse = reqparse.RequestParser()
-        parse.add_argument('nodeId',type=str,required=True,help="查询节点不能为空")
-        parse.add_argument('label',type=str,default=None)
-        args = parse.parse_args()
-        res = q.three_hop_query(args.nodeId,args.label)
-        answer = {"code":200,"message":"","data":res}
-        return jsonify(answer)      
 
 class ShortestPathQury(Resource):
     def __init__(self) -> None:
@@ -414,21 +312,7 @@ class ShortestPathQury(Resource):
         answer = {"code":200,"message":"","data":self.res}
         return jsonify(answer)
 
-class ByAttributeQuery(Resource):
-
-    def __init__(self) -> None:
-        pass
-
-    def post(self):
-        parse = reqparse.RequestParser()
-        parse.add_argument('attributeKey',type=str,required=True,help="属性不能为空")
-        parse.add_argument('attributeValue',type=str,required=True,help="属性值不能为空")
-        parse.add_argument('label',type=str,default=None)
-        args = parse.parse_args()
-        res = q.by_attribute_query(args.attributeKey,args.attributeValue,args.label)
-        answer = {"code":200,"message":"","data":res}
-        return jsonify(answer)      
-
+#根据siteID删除要素图谱以及资料包图谱中的数据
 class DeleteGraph(Resource):
     def post(self):
         parse = reqparse.RequestParser()
@@ -442,6 +326,7 @@ class DeleteGraph(Resource):
         answer = {"code":200,"message":"","data":summary}
         return jsonify(answer)      
 
+#获取节点信息
 class GetNodeInfo(Resource):
     def __init__(self) -> None:
         self.convert = Converter()
@@ -476,7 +361,6 @@ class InStructureQuery(Resource):
 
     def __init__(self) -> None:
         self.convert = Converter()
-
         self.items = []
         self.res = {}
    
@@ -593,6 +477,7 @@ class OutStructureQuery(Resource):
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
 
+#最小子图查询
 class MinimalGraph(Resource):
      
     def __init__(self) -> None:
@@ -749,8 +634,7 @@ class MinimalGraph(Resource):
                 }
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
-        #获得该表结构的根节点nodeId
-        
+               
 class StructureBodyQuery(Resource):
 
     def __init__(self) -> None:
@@ -866,7 +750,7 @@ class StructureBodyQuery(Resource):
         answer = {"code":200,"message":"","data":res}
         return jsonify(answer)
 
-#表结构：表内查询
+#返回起始节点与给定节点Id列表中的节点是否可达
 class AccessList(Resource):
 
     def __init__(self) -> None:
@@ -887,7 +771,83 @@ class AccessList(Resource):
         answer = {"code":200,"message":"","data":res_list}
         return jsonify(answer)
 
+#根据本体路径查找子图路径
+class FindAllInsPath(Resource):
+    def __init__(self) -> None:
+        self.convert = Converter()
+        self.paths = []
 
+    def _convert_data(self,nodes_map,lines_map):
+        #查询结果进行处理，处理成前段需要的格式
+        for _,node in nodes_map.items():
+            self.convert.add_node(node)
+        for tup,line in lines_map.items():
+            #拿出startNode和endNode的id
+            start_id,end_id = tup.split(',')
+            self.convert.add_relation_min_graph(start_id,line,end_id)
+
+
+    def path_convert(self,data):
+        one_start_paths = []
+        for record in data:
+            nodes_map = {}
+            lines_map = {}
+            for node in record['nodes']:
+                ID = node.__dict__.get('_properties')['nodeId']
+                if ID not in nodes_map: nodes_map[ID] = node
+            for relation in record['relations']:
+                r_dict = relation.__dict__
+                start_node = r_dict.get('_start_node')
+                inner_start_id =  start_node.__dict__.get('_properties')['nodeId']
+                end_node = r_dict.get('_end_node')
+                inner_end_id =  end_node.__dict__.get('_properties')['nodeId']
+                line_key = inner_start_id+','+inner_end_id
+                if line_key in lines_map:continue
+                lines_map[line_key] = relation
+            #转换成需求格式
+            self._convert_data(nodes_map,lines_map)
+            path = {"nodes":self.convert.nodes,
+                    "lines":self.convert.lines}
+            self.paths.append(path)
+            self.convert.deep_clear()
+
+
+    def _convert_data(self,nodes_map,lines_map):
+        #查询结果进行处理，处理成前段需要的格式
+        for _,node in nodes_map.items():
+            self.convert.add_node(node)
+        for tup,line in lines_map.items():
+            #拿出startNode和endNode的id
+            start_id,end_id = tup.split(',')
+            self.convert.add_relation_min_graph(start_id,line,end_id)
+
+    #根据查询结果拿到所有instance的列表
+    def instances(self,data):
+        instances = []
+        for node in data:
+            node_id = node.data()['ins'].get('nodeId')
+            instances.append(node_id)
+        return instances
+
+    def process(self,args):
+        node_list = args.nodeList
+        #查找起始节点的所有instance实例
+        start_instance_res = q.get_instance(node_list[0])
+        instance_list = self.instances(start_instance_res)
+        #拿出每一个start instance
+        for start_nodeId in instance_list:
+            instance_path = q.instance_path(start_nodeId,node_list[1:],len(node_list)-1)
+            self.path_convert(instance_path)
+
+    def post(self):
+        parse = reqparse.RequestParser()
+        parse.add_argument('nodeList',required=True,type=str,action="append",help="本体路径上的节点id结合")
+        args = parse.parse_args()
+        self.process(args)
+        answer = {"code":200,"message":"","data":self.paths}
+        # answer = {"code":200,"message":"","data":res}
+        return jsonify(answer)
+        
 
 def unique_line(lines):
     lines = [item for sublist in lines for item in sublist]

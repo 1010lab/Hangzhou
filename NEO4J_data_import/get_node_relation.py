@@ -2,6 +2,12 @@ import requests
 import json
 import os
 import csv
+from dotenv import load_dotenv
+
+path = os.path.join(os.getcwd(),'.env')
+load_dotenv(path)
+#图谱数据接口url
+GET_NODE_RELATION = os.environ.get("GET_NODE_RELATION")
 
 NO_RELATION = 10
 HAVA_RELATION = 11
@@ -38,7 +44,7 @@ class GetNodeRelation():
 
     def reponse(self,type):
           #站点数据接口
-        url = 'http://192.168.6.128/deep/site/Knowledge/' + type
+        url = GET_NODE_RELATION + type
         # url = "https://deepctest.hdec.com/deep/site/Knowledge/" + type
         # 构建请求的参数
         data = {
@@ -51,7 +57,7 @@ class GetNodeRelation():
         headers = {
             "Request-Origion" : "SwaggerBootstrapUi",
             "accept" : "*/*",
-            "Authorization" : "eyJhbGciOiJIUzUxMiIsInppcCI6IkRFRiJ9.eNocjMsKwjAQRf9l1i2kyeTRLgUXguLGnbhImlHqow1NFEX8d4dyd_eee76QnwE6MNgrq8JZRRFdj-RRRS2pgQoGX6BrTIsoGuMsFznzIxKlukw3GutM84tmRq9l4MVpi5ojjPMohfTGkexDkAKp9d4wSO-0OLVp7eJMND_YejxVcJ8uw3j4JGLVbr_abNfw-wMAAP__.VnnJbCzrLBtBdhrVr64RxD0P2fK9LCa8QkKn97SuFbfEcYM0NHW6NsdjeaLctrUDrG27VIH5pvK6m67lGlxnEg",
+            "Authorization" : "6",
             "Content-Type" : "application/json"
         }
         response = requests.post(url, data=payload, headers=headers)

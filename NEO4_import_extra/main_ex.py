@@ -13,17 +13,18 @@ def main_ex(args) -> Result:
     #获取BODY和INSTANCE数据并处理为CSV文件
     gnr = GetNodeRelation(args)
     # 校验码：站点数据中没有snRelationList数据->10,否则->11
-    gnr.save2csv()
-    
-
-    #Processor处理CSV文件
-    p = Processor(args)
-    #Loader导入数据
-    loader = Loader(args)
-        #返回虚拟树节点列表
-    p.get_node()
-    p.get_instance_relation()
-    loader.load_node()
-    r = loader.load_relation()
-    return r.to_string()
+    code = gnr.save2csv()
+    if code == 10:
+        return "文件中不存在节点或关系，未导入资料包"
+    else:
+        #Processor处理CSV文件
+        p = Processor(args)
+        #Loader导入数据
+        loader = Loader(args)
+            #返回虚拟树节点列表
+        p.get_node()
+        p.get_instance_relation()
+        loader.load_node()
+        r = loader.load_relation()
+        return r.to_string()
         

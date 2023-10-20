@@ -1,5 +1,3 @@
-from py2neo import Graph
-# from neo4j_query.utils import generate_id
 from neo4j import GraphDatabase
 import os
 from dotenv import load_dotenv
@@ -206,19 +204,6 @@ class Query():
                 RETURN start,r,end'''
         return self._run(cypher)
 
-    #基于固定属性查询所有结点
-    def by_attribute_query(self,attributeKey,attributeValue,label):
-        cypher = f'''MATCH (n{":"+label if label else ""})
-                     WHERE n.{attributeKey} = '{attributeValue}'
-                     return n '''
-        return self.graph.run(cypher).data()
-
-    #基于固定属性值查询所有实体，并排序
-    def order_by_attribute_query(self,attributeKey,attributeValue,label,order_by):
-        result= self.by_attribute_query(attributeKey,attributeValue,label)
-        nodes = [node['n'] for node in result]
-        return sorted(nodes, key=lambda node: node[order_by])
-
     #个数统计查询
     def count_query(self,label,siteID):
         cypher =  f'''MATCH (n:{label})
@@ -282,15 +267,16 @@ class Query():
                 database_="neo4j",
             )
         #资料包图谱中的对应站点也响应的删除
-        PACKAGE_URI = "bolt://localhost:7688"
-        PACKAGE_AUTH = (NEO4J_USER, NEO4J_PASSWORD)
-        with GraphDatabase.driver(PACKAGE_URI, auth=PACKAGE_AUTH) as package_driver:
-            package_driver.verify_connectivity()
-        _,summary_ex,_ = self.driver.execute_query(
-                cypher,
-                database_="neo4j",
-            )
-        return {"要素图谱":summary.counters.__dict__,"资料包图谱":summary_ex.counters.__dict__}        
+        # PACKAGE_URI = "bolt://localhost:7688"
+        # PACKAGE_AUTH = (NEO4J_USER, NEO4J_PASSWORD)
+        # with GraphDatabase.driver(PACKAGE_URI, auth=PACKAGE_AUTH) as package_driver:
+        #     package_driver.verify_connectivity()
+        # _,summary_ex,_ = self.driver.execute_query(
+        #         cypher,
+        #         database_="neo4j",
+        #     )
+        # return {"要素图谱":summary.counters.__dict__,"资料包图谱":summary_ex.counters.__dict__}        
+        return {"要素图谱":summary.counters.__dict__,"资料包图谱":"未导入部分"}   
 
     def get_node_info(self,nodeIdList):
         cypher = f'''MATCH (m) 
@@ -475,6 +461,30 @@ class Query():
         RETURN nodes(path) AS nodes,relationships(path) AS relations,length(path) AS hops
         ORDER BY hops
         LIMIT 1'''
-        print(cypher)
+        return self._run(cypher)
+        
+    '''
+        查询以某一节点为起点到本体对应实体路径的路径
+        @quote 
+        @parm start
+        @parm body_list
+        @parm limit_path
+    '''
+    def instance_path(self,start_nodeId,body_list,limit_path):
+        cypher = f'''MATCH (start:instance)
+            WHERE start.nodeId= "{start_nodeId}"
+            MATCH (b:body)-[r:is_instance]-(end:instance)
+            WHERE b.nodeId in {body_list}
+            CALL apoc.path.expandConfig(start, {{
+                relationshipFilter: ">belong_to",
+                labelFilter: "+instance",
+                minLevel: {limit_path},
+                maxLevel: {limit_path},
+                endNodes: [end]
+            }})
+            YIELD path
+            RETURN nodes(path) AS nodes,relationships(path) AS relations,length(path) AS hops
+            ORDER BY hops
+        '''
         return self._run(cypher)
 
