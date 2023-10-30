@@ -772,10 +772,11 @@ class AccessList(Resource):
         return jsonify(answer)
 
 #根据本体路径查找子图路径
-class FindAllInsPath(Resource):
+class FindAllInsPath(Resource): 
     def __init__(self) -> None:
         self.convert = Converter()
         self.paths = []
+        self.labc_list =[]
 
     def _convert_data(self,nodes_map,lines_map):
         #查询结果进行处理，处理成前段需要的格式
@@ -786,9 +787,23 @@ class FindAllInsPath(Resource):
             start_id,end_id = tup.split(',')
             self.convert.add_relation_min_graph(start_id,line,end_id)
 
+    def label_collection(self,node_id):
+        #查找对应ins节点的标签组节点
+        labc_res = q.find_labelCollection(node_id)
+        for labc in  labc_res:
+            labels = labc['r'].__dict__['_properties']
+            end = labc['end'].__dict__['_properties']
+            labels.pop("lineType", None)
+            labels.pop("siteID", None)
+            labc_name = end['nodeName']
+            self.labc_list.append({
+                "labelCollectionId":end['nodeId'],
+                "name":labc_name,
+                "instanceId":node_id,
+                "labels":labels
+            })
 
     def path_convert(self,data):
-        one_start_paths = []
         for record in data:
             nodes_map = {}
             lines_map = {}
@@ -806,11 +821,14 @@ class FindAllInsPath(Resource):
                 lines_map[line_key] = relation
             #转换成需求格式
             self._convert_data(nodes_map,lines_map)
-            path = {"nodes":self.convert.nodes,
-                    "lines":self.convert.lines}
+            #对于每个实体子图，查找出对应的标签组节点
+            for node_id in self.convert.nodes_id:
+                self.label_collection(node_id)
+            path = {"nodes":self.convert.nodes[::-1],
+                    "lines":self.convert.lines,
+                    "labelCollections":self.labc_list}
             self.paths.append(path)
             self.convert.deep_clear()
-
 
     def _convert_data(self,nodes_map,lines_map):
         #查询结果进行处理，处理成前段需要的格式
@@ -830,13 +848,13 @@ class FindAllInsPath(Resource):
         return instances
 
     def process(self,args):
-        node_list = args.nodeList
+        node_list = args.nodeList[::-1]
         #查找起始节点的所有instance实例
         start_instance_res = q.get_instance(node_list[0])
         instance_list = self.instances(start_instance_res)
         #拿出每一个start instance
         for start_nodeId in instance_list:
-            instance_path = q.instance_path(start_nodeId,node_list[1:],len(node_list)-1)
+            instance_path = q.instance_path(start_nodeId,node_list[1:],len(node_list)-1,node_list[-1])
             self.path_convert(instance_path)
 
     def post(self):

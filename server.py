@@ -10,7 +10,7 @@ from api.load_api import LoadApi
 # from api.load_api import LoadApiEx
 from api.query_api import *
 from api.tmp_api import *
-from api.package_query_api import *
+# from api.package_query_api import *
 
 app=Flask(__name__)
 
@@ -43,7 +43,7 @@ api.add_resource(FindAllInsPath,'/query/findAllInsPath')
 api.add_resource(Hello,'/')
 
 #----------------资料包图谱查询接口----------------#
-api.add_resource(FilesQuery,'/package/query/filesQuery')
+# api.add_resource(FilesQuery,'/package/query/filesQuery')
 
 #额外的
 

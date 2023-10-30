@@ -1,6 +1,5 @@
-from flask import jsonify,make_response
-from neo4j_query.query import Query
-from flask_restful import Resource,reqparse
+from flask import jsonify
+from flask_restful import Resource
 
 class Hello(Resource):
     def get(self):

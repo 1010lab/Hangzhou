@@ -88,12 +88,6 @@ class Query():
                     DELETE n,r'''
         self._run(cypher)
 
-    #用于查找虚拟树下的所以关系
-    def find_root_relation(self,rootId):
-        cypher = f'''MATCH (s)-[r:belong_to]->(rt:body)
-                WHERE rt.nodeId = '{rootId}'
-                RETURN s,r,rt'''
-        return self._run(cypher)
 
     def find_vir_name(self,nodeId):
         cypher = f'''MATCH (n:virtualTree)
@@ -215,9 +209,13 @@ class Query():
     #body/instance一跳关系查询
     def one_hop_query(self,nodeId,label):
         #label冗余对接是否保留
+        # cypher =  f'''MATCH (start{":"+label if label else ""})-[r]-(end{":"+label if label else ""})
+        #               WHERE start.nodeId = '{nodeId}' AND TYPE(r) in ["belong_to","is_instance"]
+        #               AND EXISTS(end.nodeName) AND end.snType IN ["0","1"]
+        #               RETURN start,r, end'''
         cypher =  f'''MATCH (start{":"+label if label else ""})-[r]-(end{":"+label if label else ""})
                       WHERE start.nodeId = '{nodeId}' AND TYPE(r) in ["belong_to","is_instance"]
-                      AND EXISTS(end.nodeName) AND end.snType IN ["0","1"]
+                      AND EXISTS(end.nodeName) 
                       RETURN start,r, end'''
         return self._run(cypher)
 
@@ -232,12 +230,6 @@ class Query():
                         RETURN start,r, end'''
         return self._run(cypher)
 
-    #三跳关系查询，不区分body和instance
-    def three_hop_query(self,nodeId,label):
-        cypher =  f'''MATCH (startNode{":"+label if label else ""})-[*1..3]->(endNode)
-                    WHERE startNode.nodeId =  '{nodeId}' 
-                    RETURN startNode, endNode'''
-        return self.graph.run(cypher).data()
 
     def shortest_path_query(self,startNodeId,endNodeId):
         cypher = f'''MATCH path = shortestPath((startNode)-[r*]-(endNode)) 
@@ -439,6 +431,7 @@ class Query():
         RETURN nodes(path) AS nodes,relationships(path) AS relations,length(path) AS hops
         ORDER BY hops
         LIMIT 1'''
+        print(cypher)
         return self._run(cypher)
 
     #实体可达性判断
@@ -465,26 +458,40 @@ class Query():
         
     '''
         查询以某一节点为起点到本体对应实体路径的路径
-        @quote 
+        @quote findAllInsPath
         @parm start
         @parm body_list
         @parm limit_path
     '''
-    def instance_path(self,start_nodeId,body_list,limit_path):
+    def instance_path(self,start_nodeId,body_list,limit_path,end_nodeId):
         cypher = f'''MATCH (start:instance)
             WHERE start.nodeId= "{start_nodeId}"
-            MATCH (b:body)-[r:is_instance]-(end:instance)
+            MATCH (b:body)-[r:is_instance]-(allow:instance)
             WHERE b.nodeId in {body_list}
+            MATCH (eb:body)-[r:is_instance]-(end:instance)
+            WHERE eb.nodeId = "{end_nodeId}"
             CALL apoc.path.expandConfig(start, {{
                 relationshipFilter: ">belong_to",
                 labelFilter: "+instance",
                 minLevel: {limit_path},
                 maxLevel: {limit_path},
+                allowlistNodes: allow,
                 endNodes: [end]
             }})
             YIELD path
             RETURN nodes(path) AS nodes,relationships(path) AS relations,length(path) AS hops
             ORDER BY hops
         '''
+        return self._run(cypher)
+
+    '''
+        查询实体节点对应的标签组节点
+        @quote findAllInsPath
+        @parm node_id
+    '''
+    def find_labelCollection(self,node_id):
+        cypher = f'''MATCH  (start:instance)-[r]-(end:labelCollection)  
+                WHERE start.nodeId = "{node_id}" 
+                RETURN r,end'''
         return self._run(cypher)
 

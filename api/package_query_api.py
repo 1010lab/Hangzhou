@@ -1,11 +1,9 @@
 from flask import jsonify,make_response
 from neo4j_query.package_query import PackageQuery
 from flask_restful import Resource,reqparse
-import math
 from api.utils import *
 from api.convert import Converter
 # from RDBS.db_utils import Mysql
-import copy
 pq = PackageQuery()
 
 class FilesQuery(Resource):

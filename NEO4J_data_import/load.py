@@ -28,7 +28,7 @@ NEO4J_USER = os.environ.get("NEO4J_USER")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 
 '''
-    自定义Result类，用于记录load的操作结果
+    自定义Result类,用于记录load的操作结果
     包括节点导入个数和关系导入个数以及相应的导入信息，默认都为空
 '''
 class Result():

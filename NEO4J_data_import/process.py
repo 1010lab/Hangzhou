@@ -97,8 +97,8 @@ class Processor():
         pid = instance_relation_df['pid']
         virtualTreeList = instance_relation_df['virtualTreeList']
         bodyRelationId = instance_relation_df['bodyRelationId']
-        # groupId = instance_relation_df['groupId']
-        groupId = instance_relation_df['siteNodeId']
+        groupId = instance_relation_df['groupId']
+        # groupId = instance_relation_df['siteNodeId']
         #根据timestamp生成INSTANCE的ID
         relationId = instance_relation_df.apply(lambda row:
                                 generate_id()
